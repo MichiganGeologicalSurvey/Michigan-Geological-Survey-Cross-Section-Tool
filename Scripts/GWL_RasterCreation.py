@@ -1,437 +1,173 @@
 # *****************************************************
 # *****************************************************
 # GWL_RasterCreation.py
-# Version: 0.1
-# Date: 09/08/2023
+# Version: 2.0
+# Date: 7/26/2024
+# Last Modified Date: 7/26/2024
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
-# Description: ArcToolbox tool script to transform groundwater data into multiple raster surfaces
+# Description: A Python custom script to generate groundwater raster surfaces based on water well points.
 # *****************************************************
 # *****************************************************
 
-import arcpy
 import os
-import sys
+import arcpy
+import Utility_Functions as uf
 import datetime
+import Dictonary
+import DataFormatting
 
-# Functions
-# ******************************************************
-def checkExtensions():
-    # Check for the Spatial Analyst Extension
-    try:
-        if arcpy.CheckExtension("Spatial") == "Available":
-            arcpy.CheckOutExtension("Spatial")
-        else:
-            raise "LicenseError"
-    except "LicenseError":
-        arcpy.AddMessage("Spatial Analyst extension is unavailable")
-        raise SystemError
-
-def createGWLraster(points,outraster,boundary):
-    if int(arcpy.management.GetCount(points)[0]) < 10:
-        arcpy.AddMessage("  *Not enough datapoints for the given time period. (At least 10 needed) Skipping time interval...*")
-        pass
-    else:
-        with arcpy.EnvManager(mask=boundary):
-            out_raster = arcpy.sa.Idw(
-                in_point_features=points,
-                z_field="SWL_ELEV",
-                cell_size=10,
-                power=2,
-                search_radius="VARIABLE 12",
-                in_barrier_polyline_features=None)
-        out_raster.save(outraster)
-        mp.addDataFromPath(outraster)
-        prj.save()
-    arcpy.management.SelectLayerByAttribute(points,"CLEAR_SELECTION")
-
-# Parameters
-# *******************************************************
-# Surface DEM
-gwlWW = arcpy.GetParameterAsText(0)
-
-# Project extent
-featExtent = arcpy.GetParameterAsText(1)
-
-# Output Water Feature
-locRaster = arcpy.GetParameterAsText(2)
-
-# Designation for Types of Wells to Review
-wellType = arcpy.GetParameterAsText(3)
-
-# Custom Range Boolean
-customRange = arcpy.GetParameterAsText(4)
-
-# List of defined date-ranges
-dateRange = arcpy.ValueTable(2)
-dateRange.loadFromString(arcpy.GetParameterAsText(5))
-
-# Local Variables
-# *******************************************************
-wkt = "PROJCS['NAD_1983_Hotine_Oblique_Mercator_Azimuth_Natural_Origin',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Hotine_Oblique_Mercator_Azimuth_Natural_Origin'],PARAMETER['False_Easting',2546731.496],PARAMETER['False_Northing',-4354009.816],PARAMETER['Scale_Factor',0.9996],PARAMETER['Azimuth',337.25556],PARAMETER['Longitude_Of_Center',-86.0],PARAMETER['Latitude_Of_Center',45.30916666666666],UNIT['Meter',1.0]]"
-
-# Begin
-# *******************************************************
-# Check for the Spatial Analyst Extension
-checkExtensions()
-
-# Establishing Spatial Reference
-sr = arcpy.SpatialReference(text=wkt)
+# Establish the parameters...
+# Establish coordinate system
+wkt = 'PROJCS["NAD_1983_Hotine_Oblique_Mercator_Azimuth_Natural_Origin",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Hotine_Oblique_Mercator_Azimuth_Natural_Origin"],PARAMETER["False_Easting",2546731.496],PARAMETER["False_Northing",-4354009.816],PARAMETER["Scale_Factor",0.9996],PARAMETER["Azimuth",337.25556],PARAMETER["Longitude_Of_Center",-86.0],PARAMETER["Latitude_Of_Center",45.30916666666666],UNIT["Meter",1.0]];-28810000 -30359300 10000;-100000 10000;-100000 10000;0.001;0.001;0.001;IsHighPrecision'
+src = arcpy.SpatialReference(text=wkt)
+uf.management.checkExtensions(self="")
 
 # Environment Variables
 arcpy.env.overwriteOutput = True
-scratchDir = arcpy.env.scratchWorkspace
-arcpy.env.workspace = scratchDir
-arcpy.AddMessage("Scratch Space: " + scratchDir)
-arcpy.env.outputCoordinateSystem = sr
+arcpy.env.outputCoordinateSystem = src
 prj = arcpy.mp.ArcGISProject("CURRENT")
-mp = prj.activeMap
+scratchDir = prj.defaultGeodatabase
+arcpy.env.preserveGlobalIds = True
+arcpy.env.transferGDBAttributeProperties = True
+arcpy.env.transferDomains = True
+uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
 
-arcpy.AddMessage("BEGIN CREATING GROUNDWATER RASTER SURFACES FOR THE AREA...")
-arcpy.AddMessage(" - Types of wells being analyzed: {}".format(wellType))
-if wellType == "All Wells":
-    if customRange == "true":
-        try:
-            try:
-                allYears = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_AllYears")
-                createGWLraster(points=gwlWW, outraster=allYears, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-1: Failed to create 'All Years' raster")
-                raise SystemError
-            try:
-                dateInterval = []
-                for i in range(0,dateRange.rowCount):
-                    startDate = dateRange.getValue(i,0)
-                    endDate = dateRange.getValue(i,1)
-                    beginningYear = int(startDate)
-                    endingYear = int(endDate)
-
-                    # Create a generic date object. The values are not important, just that the object is created to replace with
-                    # the beginning year
-                    genDate = datetime.datetime(year=1900, month=1, day=1)
-                    date1 = genDate.replace(year=beginningYear).strftime('%Y-%m-%d %H:%M:%S')
-                    date2 = genDate.replace(year=endingYear,month=12,day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    dateInterval.append([date1, date2])
-                for date in dateInterval:
-                    arcpy.AddMessage("Beginning: {}, Ending: {}".format(date[0], date[1]))
-                    firstDate = datetime.datetime.strptime(date[0], '%Y-%m-%d %H:%M:%S')
-                    secondDate = datetime.datetime.strptime(date[1], '%Y-%m-%d %H:%M:%S')
-                    firstYear = int(firstDate.year)
-                    secondYear = int(secondDate.year)
-                    rasterProject = os.path.join(locRaster,
-                                                 os.path.splitext(os.path.basename(gwlWW))[0] + "_{}_{}".format(
-                                                     firstYear,
-                                                     secondYear))
-                    selectWells = arcpy.management.SelectLayerByAttribute(
-                        in_layer_or_view=gwlWW,
-                        selection_type="NEW_SELECTION",
-                        where_clause="CONST_DATE >= timestamp '{}' And CONST_DATE <= timestamp '{}'".format(date[0],
+def gwlRasterCreation(wellType,wwPoints,wwPoints_aq,wwPoints_swlElev,wwPoints_constDate,dateRange,boundary,rasterGDB):
+    uf.management.AddMsgAndPrint("BEGIN CREATING GROUNDWATER RASTER SURFACES FOR THE AREA...")
+    uf.management.AddMsgAndPrint(" - Types of wells being analyzed: {}".format(wellType))
+    pm = prj.activeMap
+    if wellType == "All Wells":
+        allYears = os.path.join(rasterGDB,os.path.splitext(os.path.basename(wwPoints))[0] + "_AllYears")
+        uf.format.createGWLraster(
+            points=wwPoints,
+            outraster=allYears,
+            boundary=boundary,
+            map=pm,
+            swl_elev=wwPoints_swlElev
+        )
+        for date in dateRange:
+            uf.management.AddMsgAndPrint("Beginning: {}\nEnding: {}".format(date[0],date[1]))
+            firstDate = datetime.datetime.strptime(date[0],"%Y-%m-%d %H:%M:%S")
+            secondDate = datetime.datetime.strptime(date[1],"%Y-%m-%d %H:%M:%S")
+            firstYear = int(firstDate.year)
+            secondYear = int(secondDate.year)
+            rasterProject = os.path.join(rasterGDB,os.path.splitext(os.path.basename(wwPoints))[0] + "_{}_{}".format(firstYear,secondYear))
+            selectWells = arcpy.management.SelectLayerByAttribute(
+                in_layer_or_view=wwPoints,
+                selection_type="NEW_SELECTION",
+                where_clause="{0} >= timestamp '{1}' And {0} <= timestamp '{2}'".format(wwPoints_constDate,date[0],date[1]),
+                invert_where_clause=None
+            )
+            uf.format.createGWLraster(
+                points=selectWells,
+                outraster=rasterProject,
+                boundary=boundary,
+                map=pm,
+                swl_elev=wwPoints_swlElev
+            )
+    elif wellType == "Bedrock Wells":
+        allYears = os.path.join(rasterGDB, os.path.splitext(os.path.basename(wwPoints))[0] + "_AllYears_BDRK")
+        selectWells_BDRK = arcpy.management.SelectLayerByAttribute(
+            in_layer_or_view=wwPoints,
+            selection_type="NEW_SELECTION",
+            where_clause="{} = 'ROCK'",
+            invert_where_clause=None
+        )
+        uf.format.createGWLraster(
+            points=selectWells_BDRK,
+            outraster=allYears,
+            boundary=boundary,
+            map=pm,
+            swl_elev=wwPoints_swlElev
+        )
+        for date in dateRange:
+            uf.management.AddMsgAndPrint("Beginning: {}\nEnding: {}".format(date[0], date[1]))
+            firstDate = datetime.datetime.strptime(date[0], "%Y-%m-%d %H:%M:%S")
+            secondDate = datetime.datetime.strptime(date[1], "%Y-%m-%d %H:%M:%S")
+            firstYear = int(firstDate.year)
+            secondYear = int(secondDate.year)
+            rasterProject = os.path.join(rasterGDB,
+                                         os.path.splitext(os.path.basename(wwPoints))[0] + "_{}_{}_BDRK".format(firstYear,
+                                                                                                           secondYear))
+            selectWells = arcpy.management.SelectLayerByAttribute(
+                in_layer_or_view=wwPoints,
+                selection_type="NEW_SELECTION",
+                where_clause="{0} = 'ROCK' And {1} >= timestamp '{2}' And {1} <= timestamp '{3}'".format(wwPoints_aq,wwPoints_constDate, date[0],
+                                                                                        date[1]),
+                invert_where_clause=None
+            )
+            uf.format.createGWLraster(
+                points=selectWells,
+                outraster=rasterProject,
+                boundary=boundary,
+                map=pm,
+                swl_elev=wwPoints_swlElev
+            )
+    elif wellType == "Glacial Wells":
+        allYears = os.path.join(rasterGDB, os.path.splitext(os.path.basename(wwPoints))[0] + "_AllYears_DRFT")
+        selectWells_DRFT = arcpy.management.SelectLayerByAttribute(
+            in_layer_or_view=wwPoints,
+            selection_type="NEW_SELECTION",
+            where_clause="{} = 'DRIFT'",
+            invert_where_clause=None
+        )
+        uf.format.createGWLraster(
+            points=selectWells_DRFT,
+            outraster=allYears,
+            boundary=boundary,
+            map=pm,
+            swl_elev=wwPoints_swlElev
+        )
+        for date in dateRange:
+            uf.management.AddMsgAndPrint("Beginning: {}\nEnding: {}".format(date[0], date[1]))
+            firstDate = datetime.datetime.strptime(date[0], "%Y-%m-%d %H:%M:%S")
+            secondDate = datetime.datetime.strptime(date[1], "%Y-%m-%d %H:%M:%S")
+            firstYear = int(firstDate.year)
+            secondYear = int(secondDate.year)
+            rasterProject = os.path.join(rasterGDB,
+                                         os.path.splitext(os.path.basename(wwPoints))[0] + "_{}_{}_DRFT".format(
+                                             firstYear,
+                                             secondYear))
+            selectWells = arcpy.management.SelectLayerByAttribute(
+                in_layer_or_view=wwPoints,
+                selection_type="NEW_SELECTION",
+                where_clause="{0} = 'DRIFT' And {1} >= timestamp '{2}' And {1} <= timestamp '{3}'".format(wwPoints_aq,
+                                                                                                         wwPoints_constDate,
+                                                                                                         date[0],
                                                                                                          date[1]),
-                        invert_where_clause=None)
-                    createGWLraster(points=selectWells,
-                                    outraster=rasterProject,
-                                    boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-2: Failed to create other custom time range rasters")
-                raise SystemError
-        except:
-            arcpy.AddError("ERROR 038: Failed to create groundwater rasters")
-            raise SystemError
-    else:
-        try:
-            try:
-                allYears = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_AllYears")
-                createGWLraster(points=gwlWW, outraster=allYears, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-1: Failed to create 'All Years' raster")
-                raise SystemError
-            try:
-                pre2000s = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_Pre2000s")
-                selctPre2000s = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=gwlWW,
-                    selection_type="NEW_SELECTION",
-                    where_clause="CONST_DATE < timestamp '2000-01-01 00:00:00'",
-                    invert_where_clause=None)
-                createGWLraster(points=selctPre2000s, outraster=pre2000s, boundary=featExtent)
-                dateInterval = []
-                currentTime = datetime.datetime.now()
-                beginningYear = 2000
-                endingYear = int(currentTime.year)
-                for i in range(beginningYear, endingYear, 5):
-                    year1 = i
-                    year2 = i + 5
-                    # Create a generic date object. The values are not important, just that the object is created to replace with
-                    # the beginning year
-                    genDate = datetime.datetime(year=1900, month=1, day=1)
-                    if i == beginningYear:
-                        date1 = genDate.replace(year=year1).strftime('%Y-%m-%d %H:%M:%S')
-                        date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    else:
-                        if genDate.replace(year=year1,month=12,day=31).strftime('%Y-%m-%d %H:%M:%S') in dateInterval[-1][1]:
-                            date1 = genDate.replace(year=year1 + 1).strftime('%Y-%m-%d %H:%M:%S')
-                            date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            date1 = genDate.replace(year=year1).strftime('%Y-%m-%d %H:%M:%S')
-                            date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    dateInterval.append([date1, date2])
-                for date in dateInterval:
-                    arcpy.AddMessage("Beginning: {}, Ending: {}".format(date[0], date[1]))
-                    firstDate = datetime.datetime.strptime(date[0], '%Y-%m-%d %H:%M:%S')
-                    secondDate = datetime.datetime.strptime(date[1], '%Y-%m-%d %H:%M:%S')
-                    firstYear = int(firstDate.year)
-                    secondYear = int(secondDate.year)
-                    rasterProject = os.path.join(locRaster,
-                                                 os.path.splitext(os.path.basename(gwlWW))[0] + "_{}_{}".format(
-                                                     firstYear,
-                                                     secondYear))
-                    selectWells = arcpy.management.SelectLayerByAttribute(
-                        in_layer_or_view=gwlWW,
-                        selection_type="NEW_SELECTION",
-                        where_clause="CONST_DATE >= timestamp '{}' And CONST_DATE <= timestamp '{}'".format(date[0],
-                                                                                                         date[1]),
-                        invert_where_clause=None)
-                    createGWLraster(points=selectWells, outraster=rasterProject, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-2: Failed to create other custom time range rasters")
-                raise SystemError
-        except:
-            arcpy.AddError("ERROR 038: Failed to create groundwater rasters")
-            raise SystemError
-elif wellType == "Bedrock Wells":
-    if customRange == "true":
-        try:
-            try:
-                allYears = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_AllYears_BDRK")
-                selectWellsBDRK = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=gwlWW,
-                    selection_type="NEW_SELECTION",
-                    where_clause="AQ_TYPE = 'ROCK'",
-                    invert_where_clause=None)
-                createGWLraster(points=selectWellsBDRK, outraster=allYears, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-1: Failed to create 'All Years' raster")
-                raise SystemError
-            try:
-                dateInterval = []
-                for i in range(0, dateRange.rowCount):
-                    startDate = dateRange.getValue(i, 0)
-                    endDate = dateRange.getValue(i, 1)
-                    beginningYear = int(startDate)
-                    endingYear = int(endDate)
+                invert_where_clause=None
+            )
+            uf.format.createGWLraster(
+                points=selectWells,
+                outraster=rasterProject,
+                boundary=boundary,
+                map=pm,
+                swl_elev=wwPoints_swlElev
+            )
+if __name__ == "__main__":
+    wwPoints = arcpy.GetParameterAsText(0)
+    wwFields = arcpy.ValueTable(3)
+    wwFields.loadFromString(arcpy.GetParameterAsText(1))
+    featExtent = arcpy.GetParameterAsText(2)
+    wellType = arcpy.GetParameterAsText(3)
+    dateRanges = arcpy.ValueTable(2)
+    dateRanges.loadFromString(arcpy.GetParameterAsText(4))
 
-                    # Create a generic date object. The values are not important, just that the object is created to replace with
-                    # the beginning year
-                    genDate = datetime.datetime(year=1900, month=1, day=1)
-                    date1 = genDate.replace(year=beginningYear).strftime('%Y-%m-%d %H:%M:%S')
-                    date2 = genDate.replace(year=endingYear,month=12,day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    dateInterval.append([date1, date2])
-                for date in dateInterval:
-                    arcpy.AddMessage("Beginning: {}, Ending: {}".format(date[0], date[1]))
-                    firstDate = datetime.datetime.strptime(date[0], '%Y-%m-%d %H:%M:%S')
-                    secondDate = datetime.datetime.strptime(date[1], '%Y-%m-%d %H:%M:%S')
-                    firstYear = int(firstDate.year)
-                    secondYear = int(secondDate.year)
-                    rasterProject = os.path.join(locRaster,
-                                                 os.path.splitext(os.path.basename(gwlWW))[0] + "_{}_{}_BDRK".format(
-                                                     firstYear,
-                                                     secondYear))
-                    selectWells = arcpy.management.SelectLayerByAttribute(
-                        in_layer_or_view=gwlWW,
-                        selection_type="NEW_SELECTION",
-                        where_clause="AQ_TYPE = 'ROCK' And CONST_DATE >= timestamp '{}' And CONST_DATE <= timestamp '{}'".format(
-                            date[0], date[1]),
-                        invert_where_clause=None)
-                    createGWLraster(points=selectWells,
-                                    outraster=rasterProject,
-                                    boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-2: Failed to create other custom time range rasters")
-                raise SystemError
-        except:
-            arcpy.AddError("ERROR 038: Failed to create groundwater rasters")
-            raise SystemError
-    else:
-        try:
-            try:
-                allYears = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_AllYears_BDRK")
-                selectWellsBDRK = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=gwlWW,
-                    selection_type="NEW_SELECTION",
-                    where_clause="AQ_TYPE = 'ROCK'",
-                    invert_where_clause=None)
-                createGWLraster(points=selectWellsBDRK, outraster=allYears, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-1: Failed to create 'All Years' raster")
-                raise SystemError
-            try:
-                pre2000s = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_Pre2000s_BDRK")
-                selctPre2000s = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=gwlWW,
-                    selection_type="NEW_SELECTION",
-                    where_clause="AQ_TYPE = 'ROCK' And CONST_DATE < timestamp '2000-01-01 00:00:00'",
-                    invert_where_clause=None)
-                createGWLraster(points=selctPre2000s, outraster=pre2000s, boundary=featExtent)
-                dateInterval = []
-                currentTime = datetime.datetime.now()
-                beginningYear = 2000
-                endingYear = int(currentTime.year)
-                for i in range(beginningYear, endingYear, 5):
-                    year1 = i
-                    year2 = i + 5
-                    # Create a generic date object. The values are not important, just that the object is created to replace with
-                    # the beginning year
-                    genDate = datetime.datetime(year=1900, month=1, day=1)
-                    if i == beginningYear:
-                        date1 = genDate.replace(year=year1).strftime('%Y-%m-%d %H:%M:%S')
-                        date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    else:
-                        if genDate.replace(year=year1, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S') in \
-                                dateInterval[-1][1]:
-                            date1 = genDate.replace(year=year1 + 1).strftime('%Y-%m-%d %H:%M:%S')
-                            date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            date1 = genDate.replace(year=year1).strftime('%Y-%m-%d %H:%M:%S')
-                            date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    dateInterval.append([date1, date2])
-                for date in dateInterval:
-                    arcpy.AddMessage("Beginning: {}, Ending: {}".format(date[0], date[1]))
-                    firstDate = datetime.datetime.strptime(date[0], '%Y-%m-%d %H:%M:%S')
-                    secondDate = datetime.datetime.strptime(date[1], '%Y-%m-%d %H:%M:%S')
-                    firstYear = int(firstDate.year)
-                    secondYear = int(secondDate.year)
-                    rasterProject = os.path.join(locRaster,
-                                                 os.path.splitext(os.path.basename(gwlWW))[0] + "_{}_{}_BDRK".format(
-                                                     firstYear,
-                                                     secondYear))
-                    selectWells = arcpy.management.SelectLayerByAttribute(
-                        in_layer_or_view=gwlWW,
-                        selection_type="NEW_SELECTION",
-                        where_clause="AQ_TYPE = 'ROCK' And CONST_DATE >= timestamp '{}' And CONST_DATE <= timestamp '{}'".format(date[0],
-                                                                                                           date[1]),
-                        invert_where_clause=None)
-                    createGWLraster(points=selectWells, outraster=rasterProject, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-2: Failed to create other custom time range rasters")
-                raise SystemError
-        except:
-            arcpy.AddError("ERROR 038: Failed to create groundwater rasters")
-            raise SystemError
-elif wellType == "Drift Wells":
-    if customRange == "true":
-        try:
-            try:
-                allYears = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_AllYears_DRIFT")
-                selectWellsDRIFT = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=gwlWW,
-                    selection_type="NEW_SELECTION",
-                    where_clause="AQ_TYPE = 'DRIFT'",
-                    invert_where_clause=None)
-                createGWLraster(points=selectWellsDRIFT, outraster=allYears, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-1: Failed to create 'All Years' raster")
-                raise SystemError
-            try:
-                dateInterval = []
-                for i in range(0, dateRange.rowCount):
-                    startDate = dateRange.getValue(i, 0)
-                    endDate = dateRange.getValue(i, 1)
-                    beginningYear = int(startDate)
-                    endingYear = int(endDate)
-
-                    # Create a generic date object. The values are not important, just that the object is created to replace with
-                    # the beginning year
-                    genDate = datetime.datetime(year=1900, month=1, day=1)
-                    date1 = genDate.replace(year=beginningYear).strftime('%Y-%m-%d %H:%M:%S')
-                    date2 = genDate.replace(year=endingYear,month=12,day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    dateInterval.append([date1, date2])
-                for date in dateInterval:
-                    arcpy.AddMessage("Beginning: {}, Ending: {}".format(date[0], date[1]))
-                    firstDate = datetime.datetime.strptime(date[0], '%Y-%m-%d %H:%M:%S')
-                    secondDate = datetime.datetime.strptime(date[1], '%Y-%m-%d %H:%M:%S')
-                    firstYear = int(firstDate.year)
-                    secondYear = int(secondDate.year)
-                    rasterProject = os.path.join(locRaster,
-                                                 os.path.splitext(os.path.basename(gwlWW))[0] + "_{}_{}_DRIFT".format(
-                                                     firstYear,
-                                                     secondYear))
-                    selectWells = arcpy.management.SelectLayerByAttribute(
-                        in_layer_or_view=gwlWW,
-                        selection_type="NEW_SELECTION",
-                        where_clause="AQ_TYPE = 'DRIFT' And CONST_DATE >= timestamp '{}' And CONST_DATE <= timestamp '{}'".format(
-                            date[0], date[1]),
-                        invert_where_clause=None)
-                    createGWLraster(points=selectWells,
-                                    outraster=rasterProject,
-                                    boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-2: Failed to create other custom time range rasters")
-                raise SystemError
-        except:
-            arcpy.AddError("ERROR 038: Failed to create groundwater rasters")
-            raise SystemError
-    else:
-        try:
-            try:
-                allYears = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_AllYears_BDRK")
-                selectWellsDRIFT = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=gwlWW,
-                    selection_type="NEW_SELECTION",
-                    where_clause="AQ_TYPE = 'DRIFT'",
-                    invert_where_clause=None)
-                createGWLraster(points=selectWellsDRIFT, outraster=allYears, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-1: Failed to create 'All Years' raster")
-                raise SystemError
-            try:
-                pre2000s = os.path.join(locRaster, os.path.splitext(os.path.basename(gwlWW))[0] + "_Pre2000s_DRIFT")
-                selctPre2000s = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=gwlWW,
-                    selection_type="NEW_SELECTION",
-                    where_clause="AQ_TYPE = 'DRIFT' And CONST_DATE < timestamp '2000-01-01 00:00:00'",
-                    invert_where_clause=None)
-                createGWLraster(points=selctPre2000s, outraster=pre2000s, boundary=featExtent)
-                dateInterval = []
-                currentTime = datetime.datetime.now()
-                beginningYear = 2000
-                endingYear = int(currentTime.year)
-                for i in range(beginningYear, endingYear, 5):
-                    year1 = i
-                    year2 = i + 5
-                    # Create a generic date object. The values are not important, just that the object is created to replace with
-                    # the beginning year
-                    genDate = datetime.datetime(year=1900, month=1, day=1)
-                    if i == beginningYear:
-                        date1 = genDate.replace(year=year1).strftime('%Y-%m-%d %H:%M:%S')
-                        date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    else:
-                        if genDate.replace(year=year1, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S') in \
-                                dateInterval[-1][1]:
-                            date1 = genDate.replace(year=year1 + 1).strftime('%Y-%m-%d %H:%M:%S')
-                            date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            date1 = genDate.replace(year=year1).strftime('%Y-%m-%d %H:%M:%S')
-                            date2 = genDate.replace(year=year2, month=12, day=31).strftime('%Y-%m-%d %H:%M:%S')
-                    dateInterval.append([date1, date2])
-                for date in dateInterval:
-                    arcpy.AddMessage("Beginning: {}, Ending: {}".format(date[0], date[1]))
-                    firstDate = datetime.datetime.strptime(date[0], '%Y-%m-%d %H:%M:%S')
-                    secondDate = datetime.datetime.strptime(date[1], '%Y-%m-%d %H:%M:%S')
-                    firstYear = int(firstDate.year)
-                    secondYear = int(secondDate.year)
-                    rasterProject = os.path.join(locRaster,
-                                                 os.path.splitext(os.path.basename(gwlWW))[0] + "_{}_{}_DRIFT".format(
-                                                     firstYear,
-                                                     secondYear))
-                    selectWells = arcpy.management.SelectLayerByAttribute(
-                        in_layer_or_view=gwlWW,
-                        selection_type="NEW_SELECTION",
-                        where_clause="AQ_TYPE = 'DRIFT' And CONST_DATE >= timestamp '{}' And CONST_DATE <= timestamp '{}'".format(
-                            date[0],
-                            date[1]),
-                        invert_where_clause=None)
-                    createGWLraster(points=selectWells, outraster=rasterProject, boundary=featExtent)
-            except:
-                arcpy.AddError("ERROR 038-2: Failed to create other custom time range rasters")
-                raise SystemError
-        except:
-            arcpy.AddError("ERROR 038: Failed to create groundwater rasters")
-            raise SystemError
+    dateInterval = []
+    for i in range(0,dateRanges.rowCount):
+        startYear = int(dateRanges.getValue(i,0))
+        endYear = int(dateRanges.getValue(i,1))
+        genDate = datetime.datetime(year=1900,month=1,day=1)
+        date1 = genDate.replace(year=startYear).strftime('%Y-%m-%d %H:%M:%S')
+        date2 = genDate.replace(year=endYear,month=12,day=31).strftime('%Y-%m-%d %H:%M:%S')
+        dateInterval.append([date1,date2])
+    gwlRasterCreation(
+        wellType=wellType,
+        wwPoints=wwPoints,
+        wwPoints_aq=wwFields.getValue(0,1),
+        wwPoints_swlElev=wwFields.getValue(0,0),
+        wwPoints_constDate=wwFields.getValue(0,2),
+        dateRange=dateInterval,
+        boundary=featExtent,
+        rasterGDB=arcpy.GetParameterAsText(5)
+    )
