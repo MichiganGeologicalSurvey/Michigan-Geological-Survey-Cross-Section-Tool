@@ -154,7 +154,7 @@ if __name__ == "__main__":
         except:
             pass
         if elevField == "":
-            pass
+            newElevField = "DEM_ELEV"
         else:
             newElevField = elevField
 
