@@ -48,6 +48,10 @@ ArcGIS Pro toolbox containing all available MGS custom tools which include:
   - Generic Project Creation Tool
   Function: Sets up a Wellogic water well project around a given area to be used for maps and cross-sections. Water well data only applies to Michigan projects.
 
+**UserGuide_Poster_GSA_2025.pdf**
+
+  This is an instructional document that was presented at the Geological Society of America's North-Central Section Meeting. Contains helpful hints and tricks to the Cross-Section tools as of 4/1/2025.
+  
 **ArcGIS_Pro_TrainingDocument_XSEC_ONLY_YYYYMMDD.pdf**
 
   This is an instructional document for creating cross-sections only. Applicable for most users.
