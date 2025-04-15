@@ -92,7 +92,7 @@ def segmentProfiles(xsecLine,xsec,ve,raster,elev_units,polygon,outGDB):
         XSEC_NAME=xsec,
         adjust_dist=offset
     )
-    arcpy.management.Delete([locatedEvents,locatedEvents_sort,eventsTable])
+    #arcpy.management.Delete([locatedEvents,locatedEvents_sort,eventsTable])
     return profilePath
 
 if __name__ == "__main__":
@@ -129,19 +129,42 @@ if __name__ == "__main__":
             allValues = uf.management.unique_values(table=lines1, field="XSEC")
             demSR = arcpy.Describe(raster).spatialReference
             linesSR = arcpy.Describe(lines1).spatialReference
+            polySR = arcpy.Describe(polygon).spatialReference
             if demSR.name == linesSR.name:
                 lines = lines1
             else:
                 newLines = os.path.join(scratchDir, "XSEC_Lines_Projection")
                 arcpy.management.Project(lines1, newLines, demSR)
                 lines = newLines
+            if demSR.name == polySR.name:
+                copyPoply = polygon
+            else:
+
+                try:
+                    projectPoly = os.path.join(scratchDir,
+                                           "{}_Local_Project".format(os.path.splitext(os.path.basename(polygon))[0]))
+                    uf.management.testAndDelete(projectPoly)
+                except:
+                    projectPoly = os.path.join(scratchDir,
+                                           polygon.replace(" ", "_").replace("-", "_").replace("(", "").replace(")","")+"_Project")
+                with arcpy.EnvManager(
+                        outputCoordinateSystem=demSR):
+                    arcpy.management.CopyFeatures(
+                        in_features=polygon,
+                        out_feature_class=projectPoly,
+                        config_keyword="",
+                        spatial_grid_1=None,
+                        spatial_grid_2=None,
+                        spatial_grid_3=None
+                    )
+                copyPoly = projectPoly
             try:
                 newPoly = os.path.join(scratchDir,"{}_Local".format(os.path.splitext(os.path.basename(polygon))[0]))
                 uf.management.testAndDelete(newPoly)
             except:
                 newPoly = os.path.join(scratchDir,polygon.replace(" ","_").replace("-","_").replace("(","").replace(")",""))
             arcpy.management.MultipartToSinglepart(
-                in_features=polygon,
+                in_features=copyPoly,
                 out_feature_class=newPoly
             )
             featExtent = os.path.join(scratchDir,
@@ -154,7 +177,7 @@ if __name__ == "__main__":
             arcpy.management.MakeFeatureLayer(lines, "lineLayers")
             arcpy.management.SelectLayerByAttribute("lineLayers", "NEW_SELECTION", "{}='{}'".format("XSEC", xsec))
             arcpy.management.FeatureToLine(
-                in_features=featExtent,
+                in_features=newPoly,
                 out_feature_class=linesIntersect,
                 cluster_tolerance=None,
                 attributes="ATTRIBUTES"
