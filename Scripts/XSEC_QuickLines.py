@@ -1,9 +1,9 @@
 # *****************************************************
 # *****************************************************
 # XSEC_QuickLines.py
-# Version: 1.0
+# Version: 1.2
 # Date: 8/6/2024
-# Last Modified Date: 8/6/2024
+# Last Modified Date: 4/30/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create quick cross-sectional views of the essential products, such as borehole
 # data, surface profiles, and grid lines.
@@ -32,6 +32,12 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
+version = "XSEC_QuickLines.py, Version 1.2.2"
+url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tools/refs/heads/Master/Scripts/XSEC_QuickLines.py"
+uf.management.githubVersion(
+    vString=version,
+    rawurl=url
+)
 uf.management.AddMsgAndPrint("-----------------------------")
 
 if __name__ == "__main__":
@@ -785,4 +791,7 @@ if __name__ == "__main__":
     uf.management.AddMsgAndPrint(
         '***FINISHED CREATING CROSS-SECTION DATASETS UTILIZING THE SCHEMA DETAILED BY THE MICHIGAN GEOLOGICAL SURVEY***')
     uf.management.AddMsgAndPrint(" - Final cleaning of default geodatabse...")
-    arcpy.management.Delete([updateBhPoint,updateIntTable,routeWells,xsecInterval,xsecPoints,newLines])
+    if demSR.name == linesSR.name:
+        arcpy.management.Delete([updateBhPoint,updateIntTable,routeWells,xsecInterval,xsecPoints])
+    else:
+        arcpy.management.Delete([updateBhPoint, updateIntTable, routeWells, xsecInterval, xsecPoints, newLines])

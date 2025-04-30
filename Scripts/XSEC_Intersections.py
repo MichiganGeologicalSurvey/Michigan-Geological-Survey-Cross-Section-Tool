@@ -1,9 +1,9 @@
 # *****************************************************
 # *****************************************************
 # XSEC_Intersections.py
-# Version: 1.0
+# Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 7/9/2024
+# Last Modified Date: 4/30/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place intersected points of interest onto a cross-sectional view.
 # *****************************************************
@@ -25,6 +25,12 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
+version = "XSEC_Intersections.py, Version 1.2.2"
+url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tools/refs/heads/Master/Scripts/XSEC_Intersections.py"
+uf.management.githubVersion(
+    vString=version,
+    rawurl=url
+)
 uf.management.AddMsgAndPrint("-----------------------------")
 
 def intersectingPoints(lineFeature,selectDist,otherFeatures,xsec,surfDEM,elev_units,ve,outGDB):

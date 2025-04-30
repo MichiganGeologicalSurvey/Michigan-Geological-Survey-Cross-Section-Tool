@@ -1,9 +1,9 @@
 # *****************************************************
 # *****************************************************
 # Utility_Functions.py
-# Version: 1.0
+# Version: 1.2
 # Date: 5/30/2024
-# Last Modified Date: 5/30/2024
+# Last Modified Date: 4/30/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A utility functions python file to store generic definitions and functions related to other main software scripts.
 # *****************************************************
@@ -11,16 +11,8 @@
 
 import arcpy
 import os, sys
-import time
-from datetime import timedelta, datetime
-import requests, zipfile
-from io import BytesIO
 import pandas as pd
-import numpy as np
-import threading
-import glob
-
-import Utility_Functions
+import requests
 
 debug = False
 
@@ -97,6 +89,20 @@ class management:
         with arcpy.da.SearchCursor(table,field) as cursor:
             return sorted({row[0] for row in cursor})
         del row, cursor
+
+    def githubVersion(vString,rawurl):
+        # Let us check for the latest version of the toolbox.
+        try:
+            page = requests.get(rawurl)
+            raw = page.text
+            if vString in raw:
+                pass
+                arcpy.AddMessage(f"This version of the tool is up to date: {vString}")
+            else:
+                repourl = "https://github.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/releases"
+                arcpy.AddWarning(f"WARNING: You are using an outdated version of the tool ({vString})\nPlease download the latest version from {repourl}")
+        except:
+            arcpy.AddWarning("Could not verify version of tool in GitHub.")
 
 # Definitions related to project creation tool and data reformatting tool...
 class format:

@@ -1,9 +1,9 @@
 # *****************************************************
 # *****************************************************
-# XSEC_BoreholeLithology.py
-# Version: 1.0
+# XSEC_BoreholeIntervals.py
+# Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 7/9/2024
+# Last Modified Date: 4/30/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place borehole sticks with segmented borehole lithologies onto a cross-sectional view.
 # *****************************************************
@@ -26,6 +26,12 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
+version = "XSEC_BoreholesIntervals.py, Version 1.2.2"
+url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tools/refs/heads/Master/Scripts/XSEC_BoreholesIntervals.py"
+uf.management.githubVersion(
+    vString=version,
+    rawurl=url
+)
 uf.management.AddMsgAndPrint("-----------------------------")
 
 def boreholeIntervals(lines,xsec,dem,elevUnits,elevField,wellPoints,buff,ve,outGDB,stickType,intervalTable,depth_top,depth_bot):
@@ -86,7 +92,7 @@ def boreholeIntervals(lines,xsec,dem,elevUnits,elevField,wellPoints,buff,ve,outG
         else:
             break
     if stickType == "Polygon":
-        arcpy.analysis.Buffer(intervalFeat, finalInterval, "25 Unknown", "FULL", "FLAT", "NONE", None, "PLANAR")
+        arcpy.analysis.Buffer(intervalFeat, finalInterval, "10 Unknown", "FULL", "FLAT", "NONE", None, "PLANAR")
         arcpy.management.DeleteField(finalInterval, ["BUFF_DIST", "ORIG_FID"])
     else:
         arcpy.management.CopyFeatures(intervalFeat,finalInterval)

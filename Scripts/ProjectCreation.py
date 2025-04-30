@@ -1,9 +1,9 @@
 # *****************************************************
 # *****************************************************
 # ProjectCreation.py
-# Version: 2.0
+# Version: 2.2
 # Date: 7/26/2024
-# Last Modified Date: 7/26/2024
+# Last Modified Date: 4/30/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A Python custom script to reformat Wellogic data or other datasets into a format reviewed by the
 # Michigan Geological Survey. This also formats data into a project-specific area.
@@ -35,6 +35,12 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
+version = "ProjectCreation.py, Version 1.2.2"
+url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tools/refs/heads/Master/Scripts/ProjectCreation.py"
+uf.management.githubVersion(
+    vString=version,
+    rawurl=url
+)
 
 def projectCreation(projectName,projectLoc,state,standard_no,siteData,dem,customRange):
     uf.management.AddMsgAndPrint("_____________________________")
@@ -604,19 +610,15 @@ def projectCreation(projectName,projectLoc,state,standard_no,siteData,dem,custom
     if state == "Michigan":
         uf.management.AddMsgAndPrint("_____________________________")
         uf.management.AddMsgAndPrint("BEGIN FORMATTING WELLOGIC DATA...")
+        lith, wwPoints = DataFormatting.dataFormatting(
+            geologyGDB=geologyGDB,
+            prjName=projectName,
+            wellPoints=wwPoints_export,
+            lithTable=wwLith_export,
+            prjDEM=prjDEM,
+            reviewTable="https://services1.arcgis.com/vFQXQuqACTPxa4Yc/arcgis/rest/services/ReviewTable/FeatureServer/0"
+        )
         if standard_no == "2-5 Mile Project":
-            lith,wwPoints = DataFormatting.dataFormatting(
-                geologyGDB=geologyGDB,
-                prjName=projectName,
-                wellPoints=wwPoints_export,
-                lithTable=wwLith_export,
-                accessory="false",
-                username="",
-                password="",
-                prjExtent=buff5Mile,
-                prjDEM=prjDEM,
-                reviewTable="https://services1.arcgis.com/vFQXQuqACTPxa4Yc/arcgis/rest/services/ReviewTable/FeatureServer/0"
-            )
             uf.management.AddMsgAndPrint("_____________________________")
             uf.management.AddMsgAndPrint("BEGIN GENERATING GROUNDWATER SURFACES...")
             gwlUsable = os.path.join(geologyGDB, os.path.splitext(os.path.basename(wwPoints))[0] + "_GWL_USABLE")
@@ -647,18 +649,6 @@ def projectCreation(projectName,projectLoc,state,standard_no,siteData,dem,custom
                 bdrk_elev="MGS_BDRK_ELEV"
             )
         if standard_no == "User-Defined Project Area":
-            lith, wwPoints = DataFormatting.dataFormatting(
-                geologyGDB=geologyGDB,
-                prjName=projectName,
-                wellPoints=wwPoints_export,
-                lithTable=wwLith_export,
-                accessory="false",
-                username="",
-                password="",
-                prjExtent=featExtent,
-                prjDEM=prjDEM,
-                reviewTable="https://services1.arcgis.com/vFQXQuqACTPxa4Yc/arcgis/rest/services/ReviewTable/FeatureServer/0"
-            )
             uf.management.AddMsgAndPrint("_____________________________")
             uf.management.AddMsgAndPrint("BEGIN GENERATING GROUNDWATER SURFACES...")
             gwlUsable = os.path.join(geologyGDB,os.path.splitext(os.path.basename(wwPoints))[0] + "_GWL_USABLE")
