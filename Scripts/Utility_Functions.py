@@ -1,22 +1,21 @@
 # *****************************************************
 # *****************************************************
 # Utility_Functions.py
-# Version: 1.2
+# Version: 1.0
 # Date: 5/30/2024
-# Last Modified Date: 4/30/2025
+# Last Modified Date: 6/10/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A utility functions python file to store generic definitions and functions related to other main software scripts.
 # *****************************************************
 # *****************************************************
 
-import arcpy
 import os, sys
+import arcpy
 import pandas as pd
 import requests
 
 debug = False
 
-prj = arcpy.mp.ArcGISProject("CURRENT")
 # Generic functions and definitions for all scripts
 class management:
     def testAndDelete(fc):
@@ -100,7 +99,7 @@ class management:
                 arcpy.AddMessage(f"This version of the tool is up to date: {vString}")
             else:
                 repourl = "https://github.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/releases"
-                arcpy.AddWarning(f"WARNING: You are using an outdated version of the tool ({vString})\nPlease download the latest version from {repourl}")
+                arcpy.AddWarning(f"WARNING: You are using an outdated version of the tool\nPlease download the latest version from {repourl}")
         except:
             arcpy.AddWarning("Could not verify version of tool in GitHub.")
 
@@ -247,6 +246,7 @@ class format:
                     in_barrier_polyline_features=None
                 )
             out_raster.save(outraster)
+            prj = arcpy.mp.ArcGISProject("CURRENT")
             map.addDataFromPath(outraster)
             prj.save()
         arcpy.management.SelectLayerByAttribute(points,"CLEAR_SELECTION")
@@ -264,6 +264,7 @@ class format:
                     output_type="PREDICTION",
                     out_raster=outraster
                 )
+            prj = arcpy.mp.ArcGISProject("CURRENT")
             map.addDataFromPath(outraster)
             prj.save()
         arcpy.management.SelectLayerByAttribute(points, "CLEAR_SELECTION")
@@ -277,6 +278,7 @@ class format:
 # - Symbology definitions for project creation tool and data formatting tool...
 class symbols:
     def DEMSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrDEM = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symDEM = lyrDEM.symbology
         if hasattr(symDEM,"colorizer"):
@@ -293,6 +295,7 @@ class symbols:
                 lyrDEM.transparency = 50
 
     def contoursSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         field_names = [f.name for f in arcpy.ListFields(feature)]
         try:
             lyrContours = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
@@ -327,6 +330,7 @@ class symbols:
             pass
 
     def lakesSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrLake = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symLake = lyrLake.symbology
         if symLake.renderer.type == "UniqueValueRenderer":
@@ -336,6 +340,7 @@ class symbols:
         prj.save()
 
     def riverSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrRiver = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symRiver = lyrRiver.symbology
         if symRiver.renderer.type == "UniqueValueRenderer":
@@ -346,6 +351,7 @@ class symbols:
         prj.save()
 
     def roadSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         try:
             lyrRoad = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
             symRoad = lyrRoad.symbology
@@ -419,6 +425,7 @@ class symbols:
             pass
 
     def railSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrRail = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symRail = lyrRail.symbology
         if symRail.renderer.type == "UniqueValueRenderer":
@@ -429,6 +436,7 @@ class symbols:
         prj.save()
 
     def schoolSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrSchool = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symSchool = lyrSchool.symbology
         if symSchool.renderer.type == "UniqueValueRenderer":
@@ -439,6 +447,7 @@ class symbols:
         prj.save()
 
     def collegeSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrCollege = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symCollege = lyrCollege.symbology
         if symCollege.renderer.type == "UniqueValueRenderer":
@@ -448,6 +457,7 @@ class symbols:
         prj.save()
 
     def locSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrLoc = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symLoc = lyrLoc.symbology
         symLoc.renderer.symbol.applySymbolFromGallery('Star 3')
@@ -457,6 +467,7 @@ class symbols:
         prj.save()
 
     def sectionSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrSection = map.listLayers(feature)[0]
         symSection = lyrSection.symbology
         symSection.renderer.symbol.color = {'RGB': [255, 255, 255, 0]}
@@ -466,6 +477,7 @@ class symbols:
         prj.save()
 
     def townSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrTown = map.listLayers(feature)[0]
         symTown = lyrTown.symbology
         symTown.renderer.symbol.applySymbolFromGallery('Dashed Black Outline (1pt)')
@@ -474,6 +486,7 @@ class symbols:
         prj.save()
 
     def plsstownSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrTown = map.listLayers(feature)[0]
         symTown = lyrTown.symbology
         symTown.renderer.symbol.color = {'RGB': [255, 255, 255, 0]}
@@ -483,6 +496,7 @@ class symbols:
         prj.save()
 
     def stateCSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrStateC = map.listLayers(feature)[0]
         symStateC = lyrStateC.symbology
         symStateC.renderer.symbol.color = {'RGB': [255, 255, 255, 0]}
@@ -492,6 +506,7 @@ class symbols:
         prj.save()
 
     def countySymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrCounty = map.listLayers(feature)[0]
         symCounty = lyrCounty.symbology
         symCounty.renderer.symbol.color = {'RGB': [255, 255, 255, 0]}
@@ -501,6 +516,7 @@ class symbols:
         prj.save()
 
     def xsecSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrXSec = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symXSec = lyrXSec.symbology
         symXSec.renderer.symbol.outlineColor = {'RGB': [255, 255, 255, 100]}
@@ -509,6 +525,7 @@ class symbols:
         prj.save()
 
     def mile2Symbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyr2Mile = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         sym2Mile = lyr2Mile.symbology
         sym2Mile.renderer.symbol.applySymbolFromGallery('Black Outline (1pt)')
@@ -519,6 +536,7 @@ class symbols:
         prj.save()
 
     def mile5Symbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyr5Mile = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         sym5Mile = lyr5Mile.symbology
         sym5Mile.renderer.symbol.applySymbolFromGallery('Black Outline (1pt)')
@@ -529,6 +547,7 @@ class symbols:
         prj.save()
 
     def extentSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrExtent = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symExtent = lyrExtent.symbology
         symExtent.renderer.symbol.applySymbolFromGallery('Black Outline (1pt)')
@@ -539,6 +558,7 @@ class symbols:
         prj.save()
 
     def wwSymbol(map,feature):
+        prj = arcpy.mp.ArcGISProject("CURRENT")
         lyrWW = map.listLayers(os.path.splitext(os.path.basename(feature))[0])[0]
         symWW = lyrWW.symbology
         symWW.updateRenderer('UniqueValueRenderer')
@@ -908,15 +928,15 @@ class xsec:
             arcpy.management.AddField(z_line,"QUAD","TEXT")
             with arcpy.da.UpdateCursor(z_line,["DIRECTION","QUAD"]) as cursor:
                 for row in cursor:
-                    if (row[0] == "W-E" or row[0] == "NW-SE" or row[0] == "E-W"):
+                    if (row[0] == "W-E" or row[0] == "NW-SE" or row[0] == "N-S"):
                         quad = "Northwest"
                         row[1] = quad
                         management.AddMsgAndPrint(" - Analyzing line {} from the NW quad...".format(XSEC_NAME))
-                    if (row[0] == "SW-NE" or row[0] == "S-N" or row[0] == "N-S"):
+                    if (row[0] == "SW-NE" or row[0] == "S-N"):
                         quad = "Southwest"
                         row[1] = quad
                         management.AddMsgAndPrint(" - Analyzing line {} from the SW quad...".format(XSEC_NAME))
-                    if row[0] == "NE-SW":
+                    if (row[0] == "NE-SW" or row[0] == "E-W"):
                         quad = "Northeast"
                         row[1] = quad
                         management.AddMsgAndPrint(" - Analyzing line {} from the NE quad...".format(XSEC_NAME))

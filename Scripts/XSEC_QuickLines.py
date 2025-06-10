@@ -3,7 +3,7 @@
 # XSEC_QuickLines.py
 # Version: 1.2
 # Date: 8/6/2024
-# Last Modified Date: 4/30/2025
+# Last Modified Date: 6/10/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create quick cross-sectional views of the essential products, such as borehole
 # data, surface profiles, and grid lines.
@@ -32,7 +32,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_QuickLines.py, Version 1.2.2"
+version = "XSEC_QuickLines.py, Version 1.2.3"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tools/refs/heads/Master/Scripts/XSEC_QuickLines.py"
 uf.management.githubVersion(
     vString=version,
