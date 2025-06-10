@@ -13,7 +13,6 @@ import os
 import arcpy
 import Utility_Functions as uf
 import Dictonary
-import DataFormatting_PullGeology
 
 # Establish the parameters...
 # Establish coordinate system
