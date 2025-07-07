@@ -9,7 +9,7 @@
 # *****************************************************
 # *****************************************************
 import Utility_Functions as uf
-version = "Dictonary.py, Version 1.2.3"
+version = "Dictonary.py, Version 1.2.4"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/Dictonary.py"
 uf.management.githubVersion(
     vString=version,

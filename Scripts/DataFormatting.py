@@ -13,7 +13,6 @@ import os
 import arcpy
 import Utility_Functions as uf
 import Dictonary
-import DataFormatting_PullGeology
 
 # Establish the parameters...
 # Establish coordinate system
@@ -29,7 +28,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "DataFormatting.py, Version 1.2.3"
+version = "DataFormatting.py, Version 1.2.4"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/DataFormatting.py"
 uf.management.githubVersion(
     vString=version,

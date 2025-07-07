@@ -30,7 +30,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_SegmentProfiles.py, Version 1.2.3"
+version = "XSEC_SegmentProfiles.py, Version 1.2.4"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_SegmentProfiles.py"
 uf.management.githubVersion(
     vString=version,
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                 arcpy.management.Project(lines1, newLines, demSR)
                 lines = newLines
             if demSR.name == polySR.name:
-                copyPoply = polygon
+                copyPoly = polygon
             else:
 
                 try:
