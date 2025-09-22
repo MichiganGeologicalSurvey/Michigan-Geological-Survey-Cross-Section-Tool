@@ -3,7 +3,7 @@
 # XSEC_BoreholeIntervals.py
 # Version: 1.0
 # Date: 7/9/2024
-# Last Modified Date: 6/10/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place borehole sticks with segmented borehole lithologies onto a cross-sectional view.
 # *****************************************************
@@ -26,7 +26,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_BoreholesIntervals.py, Version 1.2.4"
+version = "XSEC_BoreholesIntervals.py, Version 1.2.5"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_BoreholesIntervals.py"
 uf.management.githubVersion(
     vString=version,
@@ -137,35 +137,20 @@ if __name__ == "__main__":
     except:
         updateIntTable = os.path.join(scratchDir, "{}_INT_MGS".format(arcpy.GetParameterAsText(3).replace(" ","_")))
 
-    uf.management.AddMsgAndPrint(" - Extracting elevation measurements from DEM...")
-    featExtent = os.path.join(scratchDir, "RasterArea_{}".format(os.path.splitext(os.path.basename(arcpy.GetParameterAsText(1)))[0]))
-    uf.management.testAndDelete(featExtent)
-    arcpy.ddd.RasterDomain(arcpy.GetParameterAsText(1), featExtent, "POLYGON")
-    locationsOutside = arcpy.management.SelectLayerByLocation(
-        in_layer=arcpy.GetParameterAsText(2),
-        overlap_type="WITHIN",
-        select_features=featExtent,
-        selection_type="NEW_SELECTION",
-        invert_spatial_relationship="INVERT"
+    uf.management.AddMsgAndPrint("* Extracting elevation measurements from DEM...")
+    arcpy.management.CopyFeatures(
+        in_features=arcpy.GetParameterAsText(2),
+        out_feature_class=updateBhPoint
     )
-    if int(arcpy.management.GetCount(locationsOutside)[0]) > 10:
-        arcpy.management.Delete([featExtent])
-        arcpy.management.SelectLayerByAttribute(
-            in_layer_or_view=arcpy.GetParameterAsText(2),
-            selection_type="CLEAR_SELECTION"
-        )
-        uf.management.AddMsgAndPrint("Too many locations outside the raster boundary (Limit: 10). Please review the wells and select only the records inside the defined DEM.",2)
-        quit()
-    else:
-        arcpy.management.Delete([featExtent])
-        arcpy.management.SelectLayerByAttribute(
-            in_layer_or_view=arcpy.GetParameterAsText(2),
-            selection_type="CLEAR_SELECTION"
-        )
-    arcpy.sa.ExtractValuesToPoints(
-        in_point_features=arcpy.GetParameterAsText(2),
-        in_raster=arcpy.GetParameterAsText(1),
-        out_point_features=updateBhPoint
+    arcpy.ddd.AddSurfaceInformation(
+        in_feature_class=updateBhPoint,
+        in_surface=arcpy.GetParameterAsText(1),
+        out_property="Z",
+        method="BILINEAR",
+        sample_distance=None,
+        z_factor=1,
+        pyramid_level_resolution=0,
+        noise_filtering=""
     )
     arcpy.management.AddField(
         in_table=updateBhPoint,
@@ -177,9 +162,14 @@ if __name__ == "__main__":
     arcpy.management.CalculateField(
         in_table=updateBhPoint,
         field="DEM_ELEV",
-        expression='!RASTERVALU!'
+        expression='!Z!'
     )
-    arcpy.management.DeleteField(updateBhPoint, ["RASTERVALU"])
+    arcpy.management.DeleteField(updateBhPoint, ["Z"])
+    with arcpy.da.UpdateCursor(updateBhPoint, ["DEM_ELEV"]) as cursor:
+        for row in cursor:
+            if row[0] is None:
+                cursor.deleteRow()
+        del row, cursor
     uf.management.AddMsgAndPrint(" - Copying intervals table...")
     arcpy.management.CopyRows(arcpy.GetParameterAsText(3), updateIntTable)
 

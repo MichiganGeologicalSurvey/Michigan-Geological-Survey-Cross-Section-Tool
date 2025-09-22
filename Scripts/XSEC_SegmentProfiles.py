@@ -3,7 +3,7 @@
 # XSEC_SegmentProfiles.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 6/10/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place profiles onto a cross-sectional view and segment the profiles based on a polygon of the user's choosing.
 # *****************************************************
@@ -30,7 +30,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_SegmentProfiles.py, Version 1.2.4"
+version = "XSEC_SegmentProfiles.py, Version 1.2.5"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_SegmentProfiles.py"
 uf.management.githubVersion(
     vString=version,
@@ -173,13 +173,9 @@ if __name__ == "__main__":
                 in_features=copyPoly,
                 out_feature_class=newPoly
             )
-            featExtent = os.path.join(scratchDir,
-                                      "RasterArea_{}".format(os.path.splitext(os.path.basename(raster))[0]))
-            uf.management.testAndDelete(featExtent)
-            arcpy.ddd.RasterDomain(raster, featExtent, "POLYGON")
             linesIntersect = os.path.join(scratchDir, "IntersectionsLINE")
             pointsIntersect = os.path.join(scratchDir, "IntersectionsPOINT")
-            xsecFeatureInt = os.path.join(scratchDir,"XSEC_Intersect_{}".format(os.path.splitext(os.path.basename(featExtent))[0]))
+            xsecFeatureInt = os.path.join(scratchDir,"XSEC_Intersect_{}".format(os.path.splitext(os.path.basename(newPoly))[0]))
             arcpy.management.MakeFeatureLayer(lines, "lineLayers")
             arcpy.management.SelectLayerByAttribute("lineLayers", "NEW_SELECTION", "{}='{}'".format("XSEC", xsec))
             arcpy.management.FeatureToLine(
@@ -201,7 +197,7 @@ if __name__ == "__main__":
             )
             if int(arcpy.management.GetCount(xsecFeatureInt)[0]) == 0:
                 uf.management.AddMsgAndPrint("RASTER DOES NOT INTERSECT {}. PASSING TO NEXT LINE...".format(xsec))
-                arcpy.management.Delete([linesIntersect,pointsIntersect,xsecFeatureInt,featExtent,newPoly])
+                arcpy.management.Delete([linesIntersect,pointsIntersect,xsecFeatureInt,newPoly])
             else:
                 segProfile = segmentProfiles(
                     xsecLine=lines,
@@ -217,7 +213,7 @@ if __name__ == "__main__":
                 arcpy.management.Delete(
                     [os.path.join(scratchDir, "XSEC_{}_zm".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                      os.path.join(scratchDir, "XSEC_{}_z".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
-                     newPoly,linesIntersect,pointsIntersect,xsecFeatureInt,featExtent])
+                     newPoly,linesIntersect,pointsIntersect,xsecFeatureInt])
                 arcpy.management.DeleteField(lines, ["ROUTEID",
                                                      "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
                 xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]

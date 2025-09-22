@@ -3,7 +3,7 @@
 # ProjectCreation.py
 # Version: 2.2
 # Date: 7/26/2024
-# Last Modified Date: 4/30/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A Python custom script to reformat Wellogic data or other datasets into a format reviewed by the
 # Michigan Geological Survey. This also formats data into a project-specific area.
@@ -35,7 +35,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "ProjectCreation.py, Version 1.2.4"
+version = "ProjectCreation.py, Version 1.2.5"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/ProjectCreation.py"
 uf.management.githubVersion(
     vString=version,

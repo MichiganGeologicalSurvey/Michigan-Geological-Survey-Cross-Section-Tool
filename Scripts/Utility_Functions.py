@@ -3,7 +3,7 @@
 # Utility_Functions.py
 # Version: 1.0
 # Date: 5/30/2024
-# Last Modified Date: 6/10/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A utility functions python file to store generic definitions and functions related to other main software scripts.
 # *****************************************************
@@ -903,10 +903,6 @@ class xsec:
     def zmLine_Generation(lineFeature,XSEC_NAME,defaultGDB,raster_surface):
         # We need to be able to have a line feature that has route information as well as elevation information. This
         # function establishes both for the desired cross-section line.
-        featExtent = os.path.join(defaultGDB, "RasterArea_{}".format(os.path.splitext(os.path.basename(raster_surface))[0]))
-        management.testAndDelete(featExtent)
-        arcpy.ddd.RasterDomain(raster_surface, featExtent, "POLYGON")
-
         lineFields = [f.name for f in arcpy.ListFields(lineFeature)]
         if ("XSEC" in lineFields and "DIRECTION" in lineFields):
             arcpy.management.MakeFeatureLayer(lineFeature,"lineLayers")
@@ -988,7 +984,6 @@ class xsec:
                     gapDist = ((gapX ** 2) + (gapY ** 2)) ** 0.5
                     moveLength += gapDist
             # Clean up the dataset at this stage...
-            arcpy.management.Delete([featExtent])
             return (zm_line,moveLength,checkField)
         else:
             management.AddMsgAndPrint("The fields 'XSEC' and/or 'DIRECTION' is not found within the cross-section lines feature class. Please add both/either field.\nAcceptable terms for 'DIRECTION' are as follows:\n'W-E', 'NW-SE', 'E-W', 'SW-NE', 'S-N', 'N-S', 'NE-SW', 'SE-NW'",2)

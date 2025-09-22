@@ -3,7 +3,7 @@
 # DataFormatting.py
 # Version: 1.0
 # Date: 5/31/2024
-# Last Modified Date: 6/10/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A Python custom script to reformat Wellogic data or other datasets into a format reviewed by the Michigan Geological Survey.
 # *****************************************************
@@ -28,7 +28,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "DataFormatting.py, Version 1.2.4"
+version = "DataFormatting.py, Version 1.2.5"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/DataFormatting.py"
 uf.management.githubVersion(
     vString=version,
@@ -265,11 +265,7 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
     uf.management.AddMsgAndPrint("BEGIN FORMATTING THE LITHOLOGY TABLE PROVIDED")
     try:
         # Now, we need to build the new lithology table...
-        try:
-            finalLith = os.path.join(geologyGDB,"Co" + os.path.splitext(os.path.basename(lithTable))[0].replace(" ","_")+"_FINAL")
-            uf.management.testAndDelete(finalLith)
-        except:
-            finalLith = os.path.join(geologyGDB, "Co" + lithTable.replace(" ","_") + "_FINAL")
+        finalLith = os.path.join(geologyGDB, prjName + "_lithology_FINAL")
         uf.management.AddMsgAndPrint("Creating final lithology table {}...".format(
             os.path.splitext(os.path.basename(finalLith))[0])
         )

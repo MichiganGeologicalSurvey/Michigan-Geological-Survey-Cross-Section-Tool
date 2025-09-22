@@ -3,7 +3,7 @@
 # XSEC_QuickLines.py
 # Version: 1.2
 # Date: 8/6/2024
-# Last Modified Date: 6/10/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create quick cross-sectional views of the essential products, such as borehole
 # data, surface profiles, and grid lines.
@@ -32,7 +32,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_QuickLines.py, Version 1.2.4"
+version = "XSEC_QuickLines.py, Version 1.2.5"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_QuickLines.py"
 uf.management.githubVersion(
     vString=version,
@@ -76,14 +76,14 @@ if __name__ == "__main__":
     uf.management.AddMsgAndPrint("* Preparing points and interval table...")
     try:
         updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(
-            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(2)))[0]))
+            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(2)))[0]).replace(" ","_"))
         uf.management.testAndDelete(updateBhPoint)
     except:
         updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(arcpy.GetParameterAsText(2).replace(" ", "_")))
 
     try:
         updateIntTable = os.path.join(scratchDir, "{}_INT_MGS".format(
-            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(3)))[0]))
+            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(3)))[0]).replace(" ","_"))
         uf.management.testAndDelete(updateIntTable)
     except:
         updateIntTable = os.path.join(scratchDir, "{}_INT_MGS".format(arcpy.GetParameterAsText(3).replace(" ", "_")))

@@ -1,9 +1,9 @@
 # *****************************************************
 # *****************************************************
 # GWL_RasterCreation.py
-# Version: 2.2
+# Version: 2.0
 # Date: 7/26/2024
-# Last Modified Date: 6/10/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A Python custom script to generate groundwater raster surfaces based on water well points.
 # *****************************************************
@@ -31,7 +31,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "GWL_RasterCreation.py, Version 1.2.4"
+version = "GWL_RasterCreation.py, Version 1.2.5"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/GWL_RasterCreation.py"
 uf.management.githubVersion(
     vString=version,

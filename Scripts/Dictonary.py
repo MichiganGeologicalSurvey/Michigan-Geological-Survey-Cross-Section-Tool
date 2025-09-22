@@ -3,13 +3,13 @@
 # Dictionary.py
 # Version: 1.2
 # Date: 5/31/2024
-# Last Modified Date: 4/30/2025
+# Last Modified Date: 9/22/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A Python script that outlines all the definitions for domains that are used in the various geodatabases.
 # *****************************************************
 # *****************************************************
 import Utility_Functions as uf
-version = "Dictonary.py, Version 1.2.4"
+version = "Dictonary.py, Version 1.2.5"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/Dictonary.py"
 uf.management.githubVersion(
     vString=version,
