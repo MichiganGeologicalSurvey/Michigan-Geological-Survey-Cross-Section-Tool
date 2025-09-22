@@ -12,7 +12,7 @@
    6. Reference grid.
 5. Generate individual portions of the full cross-section tool to make adjustments.
 
-## **IMPORTANT NOTE: These tools were tested with ArcGIS Pro 3.4.0. Issues may be present in other versions.**
+## **IMPORTANT NOTE: These tools were tested with ArcGIS Pro 3.5.3. Issues may be present in other versions.**
 
 ---
 
