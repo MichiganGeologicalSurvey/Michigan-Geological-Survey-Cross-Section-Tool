@@ -139,14 +139,12 @@ def intersectingPoints(lineFeature,selectDist,otherFeatures,xsec,surfDEM,elev_un
     rProps = "rkey POINT M fmp"
     eventTableXSEC = uf.xsec.locateEvents_Table(
         pts=zXsecLines,
-        rasterDEM=surfDEM,
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
         route_line=zm_line,
         checkField=id_checkField,
         sel_dist="1 Meters",
-        event_props=rProps,
-        z_type="Z"
+        event_props=rProps
     )
     eventLayerXSEC = "XSEC_{}_Events".format(xsec)
     arcpy.lr.MakeRouteEventLayer(zm_line,id_checkField,eventTableXSEC,rProps,eventLayerXSEC,"#","#","ANGLE_FIELD","TANGENT")
@@ -187,14 +185,12 @@ def intersectingPoints(lineFeature,selectDist,otherFeatures,xsec,surfDEM,elev_un
             rProps = "rkey POINT M fmp"
             eventTableXSEC = uf.xsec.locateEvents_Table(
                 pts=zXsecLines,
-                rasterDEM=surfDEM,
                 XSEC_NAME=xsec,
                 defaultGDB=scratchDir,
                 route_line=zm_line,
                 checkField=id_checkField,
                 sel_dist=selectDist,
-                event_props=rProps,
-                z_type="Z"
+                event_props=rProps
             )
             eventLayerXSEC = "XSEC_{}_Events_{}".format(xsec,os.path.splitext(os.path.basename(feature))[0])
             arcpy.lr.MakeRouteEventLayer(zm_line, id_checkField, eventTableXSEC, rProps, eventLayerXSEC, "#", "#",
