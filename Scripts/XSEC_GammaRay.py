@@ -102,14 +102,12 @@ def gammaRay(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,wellid,w
     rProps = "rkey POINT M fmp"
     eventTableWells = uf.xsec.locateEvents_Table(
         pts=zWells,
-        rasterDEM=surfDEM,
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
         route_line=zm_line,
         checkField=id_checkField,
         sel_dist=buff,
-        event_props=rProps,
-        z_type="Z"
+        event_props=rProps
     )
     eventLayerWells = "XSEC_{}_Events".format(xsec)
     arcpy.lr.MakeRouteEventLayer(zm_line, id_checkField, eventTableWells, rProps, eventLayerWells, "#", "#",
