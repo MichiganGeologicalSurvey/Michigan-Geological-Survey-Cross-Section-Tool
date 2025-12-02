@@ -1063,7 +1063,7 @@ class xsec:
             in_layer_or_view=points,
             selection_type="CLEAR_SELECTION"
         )
-        if int_table is None:
+        if int_table == "":
             xsecInterval = None
             pass
         else:
