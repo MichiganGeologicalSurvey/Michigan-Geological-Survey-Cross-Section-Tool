@@ -139,11 +139,11 @@ if __name__ == "__main__":
         custom=arcpy.GetParameterAsText(3),
         points=arcpy.GetParameterAsText(2),
         raster=surfRaster,
-        int_table=None,
+        int_table="",
         xsecline=lines,
         searchDist=arcpy.GetParameterAsText(6),
         parm_bhFields=arcpy.GetParameterAsText(4),
-        parm_intFields=None,
+        parm_intFields="",
         scratchDir=scratchDir
     )
 
