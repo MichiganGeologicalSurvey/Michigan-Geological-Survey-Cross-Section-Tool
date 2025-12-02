@@ -12,7 +12,7 @@
    6. Reference grid.
 5. Generate individual portions of the full cross-section tool to make adjustments.
 
-## **IMPORTANT NOTE: These tools were tested with ArcGIS Pro 3.5.3. Issues may be present in other versions.**
+## **IMPORTANT NOTE: These tools were tested with ArcGIS Pro 3.6.0. Issues may be present in other versions.**
 
 ---
 
@@ -135,58 +135,6 @@ Total Runtime: 3 Days 16 Hours
 ### **KNOWN ISSUES**
 
 No known issues as of 1/10/2025. Please submit bug reports in the GitHub page.
-
----
-
-### ***UPDATES***
-1/10/2025:
-All MGS tools have become modular! Each tool can work collaboratively or independently with each other. We have also introduced a new suite of tools to be used for 2D cross-sectional views:
- - MGS Cross-Section Tools: Borehole Interval Sticks
-   - Miscellaneous bug fixes to tool.
-   - Dependent on Borehole Sticks tool.
- - MGS Cross-Section Tools: Borehole Sticks
-   - Miscellaneous bug fixes to tool
- - (NEW) MGS Cross-Section Tools: Geophysical Log Placement
-   - Provides a profile-view of the down-hole geophysical log.
-   - The user must provide an Excel spreadsheet that contains the columns named DEPTH and DATA. The DATA field can be any type of geophysical data value, the chart will be plotted arbitrarily on the cross-section view.
-   - A Well ID must also be provided to define where the data is located along the profile. The ID can be pulled from the ID field in the defined feature class.
- - MGS Cross-Section Tools: Gridline Creation
-   - Allows for user input of the maximum and minimum elevation values for the display grid.
- - MGS Cross-Section Tools: Preliminary Cross-Section Profiles
-   - Allows for more integration of elevation surface rasters that is not the groundwater surface or the top of bedrock surface.
- - MGS Cross-Section Tools: Profiles
-   - Changes to incorporate multiple rasters in a single run.
- - MGS Cross-Section Tools: Segmentation of Profiles
-   - Changes to incorporate multiple rasters in a single run with their own respective polygons to split the profiles.
- - (NEW) MGS Cross-Section Tools: Surficial Markers and Intersections
-   - Provides feature class output of locations that intersect the cross-section line.
-   - Takes the same fields from the identified feature classes and applies them to the located point along the cross-section line.
-   - This can take as many features as the user desires. It also takes any of the three feature class types (points, polylines, and polygons).
-
-Data Formatting Tools:
- - Generic Project Creation Tool
-   - Now incorporates inclusion of other state databases.
-     - If the state is Michigan, an additional parameter will appear to generate groundwater and bedrock surfaces.
-   - Dependent on the Water Well Reformatting tool in order to run for Michigan.
- - Groundwater Raster Generation
-   - Allows for user input of the water well fields
-     - SWL Elevation Field
-     - Well Aquifer Field
-     - Well Construction Date Field
-   - Allows for users to chose the types of wells that will be generating the raster(s)
-     - All Well types (no differentiation)
-     - Bedrock Wells
-     - Glacial Wells
- - Water Well Reformatting (Wellogic Specific)
-   - Redesigned to incorporate remaining Wellogic fields from EGLE as well as many other fields.
- - (NEW) Dictionary & Utility Scripts
-   - New script modules that are dependent for all codes in the MGS Toolbox. 
-   - Ties together all background tasks and repeated commands into two Python scripts.
-
-All parameters and help indicators in the tools have been more clearly defined for the end user.
- - This can be hints as to acceptable fields, acceptable field types, what each parameter has an effect on, etc.
-
-Miscellaneous bug fixes have been corrected as well.
 
 ---
 
