@@ -3,7 +3,7 @@
 # XSEC_BoreholeIntervals.py
 # Version: 1.0
 # Date: 7/9/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place borehole sticks with segmented borehole lithologies onto a cross-sectional view.
 # *****************************************************
@@ -26,7 +26,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_BoreholesIntervals.py, Version 1.2.5"
+version = "XSEC_BoreholesIntervals.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_BoreholesIntervals.py"
 uf.management.githubVersion(
     vString=version,
@@ -100,7 +100,13 @@ def boreholeIntervals(lines,xsec,dem,elevUnits,elevField,wellPoints,buff,ve,outG
     return finalInterval
 
 if __name__ == "__main__":
+    uf.management.AddMsgAndPrint(" -- Pre-Cross-Section Checks -- ")
     lines = arcpy.GetParameterAsText(0)
+    surfRaster = uf.xsec.rasterProject_GeoProj(
+        surfRaster=arcpy.GetParameterAsText(1),
+        lines=lines,
+        scratchDir=scratchDir
+    )
     allValues = uf.management.unique_values(table=lines, field="XSEC")
     # Create the cross-section maps if they do not exist already
     mapList = []
@@ -122,199 +128,37 @@ if __name__ == "__main__":
         outFDS = os.path.join(arcpy.GetParameterAsText(11),FDSname)
         if not arcpy.Exists(outFDS):
             arcpy.management.CreateFeatureDataset(arcpy.GetParameterAsText(11),FDSname,unknown)
-    uf.management.AddMsgAndPrint("Preparing points and interval table...")
-    try:
-        updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(
-            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(2)))[0]))
-        uf.management.testAndDelete(updateBhPoint)
-    except:
-        updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(arcpy.GetParameterAsText(2).replace(" ","_")))
-
-    try:
-        updateIntTable = os.path.join(scratchDir, "{}_INT_MGS".format(
-            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(3)))[0]))
-        uf.management.testAndDelete(updateIntTable)
-    except:
-        updateIntTable = os.path.join(scratchDir, "{}_INT_MGS".format(arcpy.GetParameterAsText(3).replace(" ","_")))
-
-    uf.management.AddMsgAndPrint("* Extracting elevation measurements from DEM...")
-    arcpy.management.CopyFeatures(
-        in_features=arcpy.GetParameterAsText(2),
-        out_feature_class=updateBhPoint
-    )
-    arcpy.ddd.AddSurfaceInformation(
-        in_feature_class=updateBhPoint,
-        in_surface=arcpy.GetParameterAsText(1),
-        out_property="Z",
-        method="BILINEAR",
-        sample_distance=None,
-        z_factor=1,
-        pyramid_level_resolution=0,
-        noise_filtering=""
-    )
-    arcpy.management.AddField(
-        in_table=updateBhPoint,
-        field_name="DEM_ELEV",
-        field_type="DOUBLE",
-        field_is_nullable="NULLABLE",
-        field_is_required="NON_REQUIRED"
-    )
-    arcpy.management.CalculateField(
-        in_table=updateBhPoint,
-        field="DEM_ELEV",
-        expression='!Z!'
-    )
-    arcpy.management.DeleteField(updateBhPoint, ["Z"])
-    with arcpy.da.UpdateCursor(updateBhPoint, ["DEM_ELEV"]) as cursor:
-        for row in cursor:
-            if row[0] is None:
-                cursor.deleteRow()
-        del row, cursor
-    uf.management.AddMsgAndPrint(" - Copying intervals table...")
-    arcpy.management.CopyRows(arcpy.GetParameterAsText(3), updateIntTable)
-
-    if arcpy.GetParameterAsText(4) == "true":
-        bhFields = arcpy.ValueTable(3)
-        bhFields.loadFromString(arcpy.GetParameterAsText(5))
-        idField = bhFields.getValue(0, 0)
-        depthField = bhFields.getValue(0, 1)
-        elevField = bhFields.getValue(0, 2)
-
-        intervFields = arcpy.ValueTable(3)
-        intervFields.loadFromString(arcpy.GetParameterAsText(6))
-        interIdField = intervFields.getValue(0, 0)
-        topDepthField = intervFields.getValue(0, 1)
-        botDepthField = intervFields.getValue(0, 2)
-        with arcpy.da.UpdateCursor(updateIntTable, [botDepthField, topDepthField]) as cursor:
-            for row in cursor:
-                if (row[0] == 0 and row[1] == 0):
-                    cursor.deleteRow()
-                else:
-                    pass
-            del row, cursor
-        try:
-            arcpy.management.AlterField(
-                in_table=updateBhPoint,
-                field=idField,
-                new_field_name="WELLID"
-            )
-        except:
-            pass
-        try:
-            arcpy.management.AlterField(
-                in_table=updateBhPoint,
-                field=depthField,
-                new_field_name="WELL_DEPTH"
-            )
-        except:
-            pass
-        if elevField == "":
-            newElevField = ""
-        else:
-            newElevField = elevField
-
-        try:
-            arcpy.management.AlterField(
-                in_table=updateIntTable,
-                field=interIdField,
-                new_field_name="WELLID"
-            )
-        except:
-            pass
-        try:
-            arcpy.management.AlterField(
-                in_table=updateIntTable,
-                field=topDepthField,
-                new_field_name="DEPTH_TOP"
-            )
-            newTopDepthField = "DEPTH_TOP"
-        except:
-            pass
-        try:
-            arcpy.management.AlterField(
-                in_table=updateIntTable,
-                field=botDepthField,
-                new_field_name="DEPTH"
-            )
-            newBotDepthField = "DEPTH"
-        except:
-            pass
-    else:
-        updateIntTable = arcpy.GetParameterAsText(3)
-        newIdField = "WELLID"
-        newElevField = "DEM_ELEV"
-        newWellDepth = "WELL_DEPTH"
-        newTopDepthField = "DEPTH_TOP"
-        newBotDepthField = "DEPTH"
-
-    if newTopDepthField in [f.name for f in arcpy.ListFields(updateIntTable)]:
-        pass
-    else:
-        arcpy.management.AddField(
-            in_table=updateIntTable,
-            field_name="DEPTH_TOP",
-            field_type="DOUBLE",
-            field_is_nullable="NULLABLE",
-            field_is_required="NON_REQUIRED"
-        )
-        arcpy.management.CalculateField(
-            in_table=updateIntTable,
-            field="DEPTH_TOP",
-            expression='!DEPTH! - !THICKNESS!'
-        )
-    uf.management.AddMsgAndPrint(" - Locating wells near cross-section line(s)...")
-    wellIds = []
-    locations = arcpy.management.SelectLayerByLocation(
-        in_layer=updateBhPoint,
-        overlap_type="WITHIN_A_DISTANCE",
-        select_features=lines,
-        search_distance=arcpy.GetParameterAsText(8),
-        selection_type="NEW_SELECTION"
-    )
-    with arcpy.da.SearchCursor(locations, ["WELLID"]) as cursor:
-        for row in cursor:
-            wellIds.append(row[0])
-        del row, cursor
-    arcpy.management.SelectLayerByAttribute(
-        in_layer_or_view=updateBhPoint,
-        selection_type="CLEAR_SELECTION"
-    )
-    xsecInterval = os.path.join(scratchDir, "{}_Select".format(os.path.splitext(os.path.basename(updateIntTable))[0]))
-    uf.management.testAndDelete(xsecInterval)
-    arcpy.management.CopyRows(updateIntTable, xsecInterval)
-    with arcpy.da.UpdateCursor(xsecInterval,["WELLID"]) as cursor:
-        for row in cursor:
-            if row[0] not in wellIds:
-                cursor.deleteRow()
-        del row, cursor
-    arcpy.management.SelectLayerByAttribute(updateIntTable, "CLEAR_SELECTION")
-    routeWells = arcpy.management.SelectLayerByAttribute(
-        in_layer_or_view=updateBhPoint,
-        selection_type="ADD_TO_SELECTION",
-        where_clause="WELLID IN {}".format(wellIds).replace("[", "(").replace("]", ")"),
-        invert_where_clause=None)
-    xsecPoints = os.path.join(scratchDir, "{}_Select".format(os.path.splitext(os.path.basename(updateBhPoint))[0]))
-    uf.management.testAndDelete(xsecPoints)
-    arcpy.management.CopyFeatures(routeWells, xsecPoints)
-    arcpy.management.SelectLayerByAttribute(updateBhPoint, "CLEAR_SELECTION")
     uf.management.AddMsgAndPrint("-----------------------------")
+    uf.management.AddMsgAndPrint("BEGIN CREATING BOREHOLE LITHOLOGY STICKS...")
+
+    updateBhPoint, updateIntTable, newIdField, newElevField, newWellDepth, newTopDepthField, newBotDepthField = uf.xsec.pointsNearLine(
+        custom=arcpy.GetParameterAsText(4),
+        points=arcpy.GetParameterAsText(2),
+        raster=surfRaster,
+        int_table=arcpy.GetParameterAsText(3),
+        xsecline=lines,
+        searchDist=arcpy.GetParameterAsText(8),
+        parm_bhFields=arcpy.GetParameterAsText(5),
+        parm_intFields=arcpy.GetParameterAsText(6),
+        scratchDir=scratchDir
+    )
 
     for xsec in allValues:
         uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
         intervalBoreholes = boreholeIntervals(
             lines=lines,
             xsec=xsec,
-            dem=arcpy.GetParameterAsText(1),
+            dem=surfRaster,
             elevUnits=arcpy.GetParameterAsText(7),
             elevField=newElevField,
-            wellPoints=xsecPoints,
+            wellPoints=updateBhPoint,
             buff=arcpy.GetParameterAsText(8),
             ve=arcpy.GetParameterAsText(9),
             outGDB=arcpy.GetParameterAsText(11),
             stickType=arcpy.GetParameterAsText(10),
-            intervalTable=xsecInterval,
-            depth_top="DEPTH_TOP",
-            depth_bot="DEPTH"
+            intervalTable=updateIntTable,
+            depth_top=newTopDepthField,
+            depth_bot=newBotDepthField
         )
         # Now, to clean up the database for the next cross-section or other steps...
         uf.management.AddMsgAndPrint("Cleaning default geodatabse...")
@@ -330,4 +174,4 @@ if __name__ == "__main__":
         xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
         xsecMap.addDataFromPath(intervalBoreholes)
         uf.management.AddMsgAndPrint("-----------------------------")
-    arcpy.management.Delete([xsecInterval,xsecPoints,updateBhPoint,updateIntTable])
+    arcpy.management.Delete([updateBhPoint,updateIntTable])

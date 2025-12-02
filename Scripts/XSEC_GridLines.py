@@ -3,7 +3,7 @@
 # XSEC_GridLines.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place gridded profiles onto a cross-sectional view.
 # *****************************************************
@@ -27,8 +27,8 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_Gridlines.py, Version 1.2.5"
-url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_Gridlines.py"
+version = "XSEC_GridLines.py, Version 1.2.6"
+url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_GridLines.py"
 uf.management.githubVersion(
     vString=version,
     rawurl=url
@@ -45,11 +45,16 @@ def gridProfile(xsecLine,xsecName,elevation,surfRaster,bdrkRaster,maxBH_elev,max
     if bdrkRaster == "":
         pass
     else:
+        projectBDRKRaster = uf.xsec.rasterProject_GeoProj(
+            surfRaster=arcpy.GetParameterAsText(10),
+            lines=xsecLine,
+            scratchDir=scratchDir
+        )
         zm_lineBDRK, offsetBDRK, id_checkField_BDRK = uf.xsec.zmLine_Generation(
             lineFeature=xsecLine,
             XSEC_NAME=xsecName,
             defaultGDB=scratchDir,
-            raster_surface=bdrkRaster
+            raster_surface=projectBDRKRaster
         )
     topoDesc = arcpy.Describe(zm_lineSURF)
     if bdrkRaster != "":
@@ -302,6 +307,7 @@ def gridProfile(xsecLine,xsecName,elevation,surfRaster,bdrkRaster,maxBH_elev,max
     return framePath, labelPath
 
 if __name__ == "__main__":
+    uf.management.AddMsgAndPrint(" -- Pre-Cross-Section Checks -- ")
     lines = arcpy.GetParameterAsText(0)
     allValues = uf.management.unique_values(table=lines, field="XSEC")
     # Create the cross-section maps if they do not exist already
@@ -345,12 +351,16 @@ if __name__ == "__main__":
             uf.management.AddMsgAndPrint(
                 " ** Distance Units: {} {}\n ** Elevation Units: {} {}".format(xInt, xUnits, yInt,
                                                                                yUnits))
-
+            surfRaster = uf.xsec.rasterProject_GeoProj(
+                surfRaster=arcpy.GetParameterAsText(2),
+                lines=lines,
+                scratchDir=scratchDir
+            )
             frame, labels = gridProfile(
                 xsecLine=lines,
                 xsecName=xsec,
                 elevation=arcpy.GetParameterAsText(1),
-                surfRaster=arcpy.GetParameterAsText(2),
+                surfRaster=surfRaster,
                 bdrkRaster="",
                 maxBH_elev=elevTop,
                 maxDepthElev=elevBot,

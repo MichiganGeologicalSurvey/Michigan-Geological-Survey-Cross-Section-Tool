@@ -3,7 +3,7 @@
 # XSEC_Intersections.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place intersected points of interest onto a cross-sectional view.
 # *****************************************************
@@ -25,7 +25,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_Intersections.py, Version 1.2.5"
+version = "XSEC_Intersections.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_Intersections.py"
 uf.management.githubVersion(
     vString=version,
@@ -224,6 +224,11 @@ def intersectingPoints(lineFeature,selectDist,otherFeatures,xsec,surfDEM,elev_un
 if __name__ == "__main__":
     lines = arcpy.GetParameterAsText(0)
     allValues = uf.management.unique_values(table=lines, field="XSEC")
+    surfRaster = uf.xsec.rasterProject_GeoProj(
+        surfRaster=arcpy.GetParameterAsText(3),
+        lines=lines,
+        scratchDir=scratchDir
+    )
     # Create the cross-section maps if they do not exist already
     mapList = []
     for Value in allValues:
@@ -251,7 +256,7 @@ if __name__ == "__main__":
             selectDist=arcpy.GetParameterAsText(1),
             otherFeatures=arcpy.GetParameterAsText(2),
             xsec=xsec,
-            surfDEM=arcpy.GetParameterAsText(3),
+            surfDEM=surfRaster,
             elev_units=arcpy.GetParameterAsText(4),
             ve=arcpy.GetParameterAsText(5),
             outGDB=arcpy.GetParameterAsText(6)

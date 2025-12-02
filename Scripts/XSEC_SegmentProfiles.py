@@ -3,7 +3,7 @@
 # XSEC_SegmentProfiles.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place profiles onto a cross-sectional view and segment the profiles based on a polygon of the user's choosing.
 # *****************************************************
@@ -30,7 +30,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_SegmentProfiles.py, Version 1.2.5"
+version = "XSEC_SegmentProfiles.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_SegmentProfiles.py"
 uf.management.githubVersion(
     vString=version,
@@ -95,13 +95,13 @@ def segmentProfiles(xsecLine,xsec,ve,raster,elev_units,polygon,outGDB):
         profile=profilePath,
         id_field="rkey",
         elev_units=elev_units,
-        XSEC_NAME=xsec,
-        adjust_dist=offset
+        XSEC_NAME=xsec
     )
     #arcpy.management.Delete([locatedEvents,locatedEvents_sort,eventsTable])
     return profilePath
 
 if __name__ == "__main__":
+    uf.management.AddMsgAndPrint(" -- Pre-Cross-Section Checks -- ")
     lines1 = arcpy.GetParameterAsText(0)
     allValues = uf.management.unique_values(table=lines1, field="XSEC")
     # Create the cross-section maps if they do not exist already
@@ -132,8 +132,13 @@ if __name__ == "__main__":
             raster = rasterPolys.getValue(i,0)
             polygon = rasterPolys.getValue(i,1)
             uf.management.AddMsgAndPrint(" - Processing {}: {}...".format(raster,polygon))
+            surfRaster = uf.xsec.rasterProject_GeoProj(
+                surfRaster=raster,
+                lines=lines1,
+                scratchDir=scratchDir
+            )
             allValues = uf.management.unique_values(table=lines1, field="XSEC")
-            demSR = arcpy.Describe(raster).spatialReference
+            demSR = arcpy.Describe(surfRaster).spatialReference
             linesSR = arcpy.Describe(lines1).spatialReference
             polySR = arcpy.Describe(polygon).spatialReference
             if demSR.name == linesSR.name:
@@ -145,14 +150,13 @@ if __name__ == "__main__":
             if demSR.name == polySR.name:
                 copyPoly = polygon
             else:
-
                 try:
                     projectPoly = os.path.join(scratchDir,
-                                           "{}_Local_Project".format(os.path.splitext(os.path.basename(polygon))[0]))
+                                           "Local_Project_{}".format(os.path.splitext(os.path.basename(polygon))[0]))
                     uf.management.testAndDelete(projectPoly)
                 except:
                     projectPoly = os.path.join(scratchDir,
-                                           polygon.replace(" ", "_").replace("-", "_").replace("(", "").replace(")","")+"_Project")
+                                           "Project_"+polygon.replace(" ", "_").replace("-", "_").replace("(", "").replace(")",""))
                 with arcpy.EnvManager(
                         outputCoordinateSystem=demSR):
                     arcpy.management.CopyFeatures(
@@ -165,10 +169,10 @@ if __name__ == "__main__":
                     )
                 copyPoly = projectPoly
             try:
-                newPoly = os.path.join(scratchDir,"{}_Local".format(os.path.splitext(os.path.basename(polygon))[0]))
+                newPoly = os.path.join(scratchDir,"Local_{}".format(os.path.splitext(os.path.basename(polygon))[0]))
                 uf.management.testAndDelete(newPoly)
             except:
-                newPoly = os.path.join(scratchDir,polygon.replace(" ","_").replace("-","_").replace("(","").replace(")",""))
+                newPoly = os.path.join(scratchDir,"Local_"+polygon.replace(" ","_").replace("-","_").replace("(","").replace(")",""))
             arcpy.management.MultipartToSinglepart(
                 in_features=copyPoly,
                 out_feature_class=newPoly
@@ -203,7 +207,7 @@ if __name__ == "__main__":
                     xsecLine=lines,
                     xsec=xsec,
                     ve=arcpy.GetParameterAsText(3),
-                    raster=raster,
+                    raster=surfRaster,
                     elev_units=arcpy.GetParameterAsText(2),
                     polygon=newPoly,
                     outGDB=arcpy.GetParameterAsText(4)

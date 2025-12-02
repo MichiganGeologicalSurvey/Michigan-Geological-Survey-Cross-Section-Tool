@@ -3,7 +3,7 @@
 # DataFormatting.py
 # Version: 1.0
 # Date: 5/31/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A Python custom script to reformat Wellogic data or other datasets into a format reviewed by the Michigan Geological Survey.
 # *****************************************************
@@ -16,7 +16,7 @@ import Dictonary
 
 # Establish the parameters...
 # Establish coordinate system
-src = arcpy.SpatialReference(102121)
+src = arcpy.SpatialReference(102123)
 uf.management.checkExtensions(self="")
 
 # Environment Variables
@@ -28,7 +28,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "DataFormatting.py, Version 1.2.5"
+version = "DataFormatting.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/DataFormatting.py"
 uf.management.githubVersion(
     vString=version,

@@ -3,7 +3,7 @@
 # XSEC_GammaRay.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and project gamma ray data from wells onto a cross-sectional view.
 # *****************************************************
@@ -26,7 +26,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_GammaRay.py, Version 1.2.5"
+version = "XSEC_GammaRay.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_GammaRay.py"
 uf.management.githubVersion(
     vString=version,
@@ -196,6 +196,11 @@ def gammaRay(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,wellid,w
 if __name__ == "__main__":
     lines = arcpy.GetParameterAsText(0)
     allValues = uf.management.unique_values(table=lines,field="XSEC")
+    surfRaster = uf.xsec.rasterProject_GeoProj(
+        surfRaster=arcpy.GetParameterAsText(2),
+        lines=lines,
+        scratchDir=scratchDir
+    )
     # Create the cross-section maps if they do not exist already
     mapList = []
     for Value in allValues:
@@ -244,7 +249,7 @@ if __name__ == "__main__":
             gammaStick, gammaRayPlot = gammaRay(
                 lineFeature=lines,
                 xsec=xsec,
-                surfDEM=arcpy.GetParameterAsText(2),
+                surfDEM=surfRaster,
                 elev_units=arcpy.GetParameterAsText(1),
                 elev_field=arcpy.GetParameterAsText(5),
                 well_points=wellFeature,

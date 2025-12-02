@@ -3,7 +3,7 @@
 # XSEC_QuickLines.py
 # Version: 1.2
 # Date: 8/6/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create quick cross-sectional views of the essential products, such as borehole
 # data, surface profiles, and grid lines.
@@ -12,8 +12,6 @@
 
 import arcpy
 import os
-import numpy as np
-import threading
 import Utility_Functions as uf
 import XSEC_BoreholesIntervals
 import XSEC_Profiles
@@ -32,7 +30,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_QuickLines.py, Version 1.2.5"
+version = "XSEC_QuickLines.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_QuickLines.py"
 uf.management.githubVersion(
     vString=version,
@@ -41,9 +39,15 @@ uf.management.githubVersion(
 uf.management.AddMsgAndPrint("-----------------------------")
 
 if __name__ == "__main__":
+    uf.management.AddMsgAndPrint(" -- Pre-Cross-Section Checks -- ")
     lines1 = arcpy.GetParameterAsText(0)
     allValues = uf.management.unique_values(table=lines1, field="XSEC")
-    demSR = arcpy.Describe(arcpy.GetParameterAsText(1)).spatialReference
+    surfRaster = uf.xsec.rasterProject_GeoProj(
+        surfRaster=arcpy.GetParameterAsText(1),
+        lines=arcpy.GetParameterAsText(0),
+        scratchDir=scratchDir
+    )
+    demSR = arcpy.Describe(surfRaster).spatialReference
     linesSR = arcpy.Describe(arcpy.GetParameterAsText(0)).spatialReference
     if demSR.name == linesSR.name:
         lines = lines1
@@ -71,224 +75,80 @@ if __name__ == "__main__":
         outFDS = os.path.join(arcpy.GetParameterAsText(16),FDSname)
         if not arcpy.Exists(outFDS):
             arcpy.management.CreateFeatureDataset(arcpy.GetParameterAsText(16),FDSname,unknown)
+
     uf.management.AddMsgAndPrint("-----------------------------")
     uf.management.AddMsgAndPrint("BEGIN CREATING BOREHOLE LITHOLOGY STICKS...")
-    uf.management.AddMsgAndPrint("* Preparing points and interval table...")
-    try:
-        updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(
-            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(2)))[0]).replace(" ","_"))
-        uf.management.testAndDelete(updateBhPoint)
-    except:
-        updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(arcpy.GetParameterAsText(2).replace(" ", "_")))
 
-    try:
-        updateIntTable = os.path.join(scratchDir, "{}_INT_MGS".format(
-            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(3)))[0]).replace(" ","_"))
-        uf.management.testAndDelete(updateIntTable)
-    except:
-        updateIntTable = os.path.join(scratchDir, "{}_INT_MGS".format(arcpy.GetParameterAsText(3).replace(" ", "_")))
-
-    uf.management.AddMsgAndPrint("* Extracting elevation measurements from DEM...")
-    arcpy.management.CopyFeatures(
-        in_features=arcpy.GetParameterAsText(2),
-        out_feature_class=updateBhPoint
+    updateBhPoint,updateIntTable,newIdField,newElevField,newWellDepth,newTopDepthField,newBotDepthField = uf.xsec.pointsNearLine(
+        custom=arcpy.GetParameterAsText(4),
+        raster=surfRaster,
+        points=arcpy.GetParameterAsText(2),
+        int_table=arcpy.GetParameterAsText(3),
+        xsecline=lines,
+        searchDist=arcpy.GetParameterAsText(13),
+        parm_bhFields=arcpy.GetParameterAsText(5),
+        parm_intFields=arcpy.GetParameterAsText(6),
+        scratchDir=scratchDir
     )
-    arcpy.ddd.AddSurfaceInformation(
-        in_feature_class=updateBhPoint,
-        in_surface=arcpy.GetParameterAsText(1),
-        out_property="Z",
-        method="BILINEAR",
-        sample_distance=None,
-        z_factor=1,
-        pyramid_level_resolution=0,
-        noise_filtering=""
-    )
-    arcpy.management.AddField(
-        in_table=updateBhPoint,
-        field_name="DEM_ELEV",
-        field_type="DOUBLE",
-        field_is_nullable="NULLABLE",
-        field_is_required="NON_REQUIRED"
-    )
-    arcpy.management.CalculateField(
-        in_table=updateBhPoint,
-        field="DEM_ELEV",
-        expression='!Z!'
-    )
-    arcpy.management.DeleteField(updateBhPoint, ["Z"])
-    with arcpy.da.UpdateCursor(updateBhPoint,["DEM_ELEV"]) as cursor:
-        for row in cursor:
-            if row[0] is None:
-                cursor.deleteRow()
-        del row, cursor
-    uf.management.AddMsgAndPrint("* Copying intervals table...")
-    arcpy.management.CopyRows(arcpy.GetParameterAsText(3), updateIntTable)
-
     if arcpy.GetParameterAsText(4) == "true":
-        bhFields = arcpy.ValueTable(3)
-        bhFields.loadFromString(arcpy.GetParameterAsText(5))
-        idField = bhFields.getValue(0, 0)
-        depthField = bhFields.getValue(0, 1)
-        elevField = bhFields.getValue(0, 2)
-
-        intervFields = arcpy.ValueTable(3)
-        intervFields.loadFromString(arcpy.GetParameterAsText(6))
-        interIdField = intervFields.getValue(0, 0)
-        topDepthField = intervFields.getValue(0, 1)
-        botDepthField = intervFields.getValue(0, 2)
-        with arcpy.da.UpdateCursor(updateIntTable, [botDepthField, topDepthField]) as cursor:
-            for row in cursor:
-                if (row[0] == 0 and row[1] == 0):
-                    cursor.deleteRow()
-                else:
-                    pass
-            del row, cursor
-        try:
-            arcpy.management.AlterField(
-                in_table=updateBhPoint,
-                field=idField,
-                new_field_name="WELLID"
-            )
-        except:
-            pass
-        try:
-            arcpy.management.AlterField(
-                in_table=updateBhPoint,
-                field=depthField,
-                new_field_name="WELL_DEPTH"
-            )
-        except:
-            pass
-        if elevField == "":
-            newElevField = "DEM_ELEV"
-        else:
-            newElevField = elevField
-
-        try:
-            arcpy.management.AlterField(
-                in_table=updateIntTable,
-                field=interIdField,
-                new_field_name="WELLID"
-            )
-        except:
-            pass
-        try:
-            arcpy.management.AlterField(
-                in_table=updateIntTable,
-                field=topDepthField,
-                new_field_name="DEPTH_TOP"
-            )
-            newTopDepthField = "DEPTH_TOP"
-        except:
-            pass
-        try:
-            arcpy.management.AlterField(
-                in_table=updateIntTable,
-                field=botDepthField,
-                new_field_name="DEPTH"
-            )
-            newBotDepthField = "DEPTH"
-        except:
-            pass
-    else:
-        newIdField = "WELLID"
-        newElevField = "DEM_ELEV"
-        newWellDepth = "WELL_DEPTH"
-        newTopDepthField = "DEPTH_TOP"
-        newBotDepthField = "DEPTH"
-    if "DEPTH_TOP" in [f.name for f in arcpy.ListFields(updateIntTable)]:
-        pass
-    else:
-        arcpy.management.AddField(
-            in_table=updateIntTable,
-            field_name="DEPTH_TOP",
-            field_type="DOUBLE",
-            field_is_nullable="NULLABLE",
-            field_is_required="NON_REQUIRED"
-        )
-        arcpy.management.CalculateField(
-            in_table=updateIntTable,
-            field="DEPTH_TOP",
-            expression='!DEPTH! - !THICKNESS!'
-        )
-    constDateField = "CONST_DATE"
-    bdrkDepthField = "MGS_DEPTH_2_BDRK"
-    if constDateField in [f.name for f in arcpy.ListFields(updateBhPoint)]:
-        if arcpy.ListFields(updateBhPoint,constDateField)[0].type != "Date":
-            arcpy.management.AddField(
-                in_table=updateBhPoint,
-                field_name="CONST_DATE_2",
-                field_type="DATE",
-                field_is_nullable="NULLABLE",
-                field_is_required="NON_REQUIRED"
-            )
-            arcpy.management.CalculateField(
-                in_table=updateBhPoint,
-                field="CONST_DATE_2",
-                expression='!CONST_DATE!'
-            )
-            newConstDateField = "CONST_DATE_2"
-        else:
-            newConstDateField = "CONST_DATE"
-    else:
+        extraFields = arcpy.ValueTable(2)
+        extraFields.loadFromString(arcpy.GetParameterAsText(7))
+        constDateField = extraFields.getValue(0, 0)
+        bdrkField = extraFields.getValue(0, 1)
         newConstDateField = None
-    with arcpy.da.UpdateCursor(updateIntTable,["DEPTH","DEPTH_TOP"]) as cursor:
-        for row in cursor:
-            if (row[0] == 0 and row[1] == 0):
-                cursor.deleteRow()
+        newBdrkField = None
+        if (constDateField != "" and constDateField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
+            if arcpy.ListFields(updateBhPoint, constDateField)[0].type != "Date":
+                arcpy.management.AddField(
+                    in_table=updateBhPoint,
+                    field_name="CONST_DATE_2",
+                    field_type="DATE",
+                    field_is_nullable="NULLABLE",
+                    field_is_required="NON_REQUIRED"
+                )
+                arcpy.management.CalculateField(
+                    in_table=updateBhPoint,
+                    field="CONST_DATE_2",
+                    expression=f'!{constDateField}!'
+                )
+                newConstDateField = "CONST_DATE_2"
             else:
-                pass
-        del row, cursor
-    uf.management.AddMsgAndPrint("* Locating wells near cross-section line(s)...")
-    wellIds = []
-    locations = arcpy.management.SelectLayerByLocation(
-        in_layer=updateBhPoint,
-        overlap_type="WITHIN_A_DISTANCE",
-        select_features=lines,
-        search_distance=arcpy.GetParameterAsText(13),
-        selection_type="NEW_SELECTION"
-    )
-    with arcpy.da.SearchCursor(locations, ["WELLID"]) as cursor:
-        for row in cursor:
-            wellIds.append(row[0])
-        del row, cursor
-    arcpy.management.SelectLayerByAttribute(
-        in_layer_or_view=updateBhPoint,
-        selection_type="CLEAR_SELECTION"
-    )
-    xsecInterval = os.path.join(scratchDir, "{}_Select".format(os.path.splitext(os.path.basename(updateIntTable))[0]))
-    uf.management.testAndDelete(xsecInterval)
-    arcpy.management.CopyRows(updateIntTable, xsecInterval)
-    with arcpy.da.UpdateCursor(xsecInterval, ["WELLID"]) as cursor:
-        for row in cursor:
-            if row[0] not in wellIds:
-                cursor.deleteRow()
-        del row, cursor
-    arcpy.management.SelectLayerByAttribute(updateIntTable, "CLEAR_SELECTION")
-    routeWells = arcpy.management.SelectLayerByAttribute(
-        in_layer_or_view=updateBhPoint,
-        selection_type="ADD_TO_SELECTION",
-        where_clause="WELLID IN {}".format(wellIds).replace("[", "(").replace("]", ")"),
-        invert_where_clause=None)
-    xsecPoints = os.path.join(scratchDir, "{}_Select".format(os.path.splitext(os.path.basename(updateBhPoint))[0]))
-    uf.management.testAndDelete(xsecPoints)
-    arcpy.management.CopyFeatures(routeWells, xsecPoints)
-    arcpy.management.SelectLayerByAttribute(updateBhPoint, "CLEAR_SELECTION")
-
+                newConstDateField = "CONST_DATE"
+        else:
+            pass
+        if (bdrkField != "" and bdrkField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
+            if arcpy.ListFields(updateBhPoint, bdrkField)[0].type != "Double":
+                arcpy.management.AddField(
+                    in_table=updateBhPoint,
+                    field_name="MGS_DEPTH_2_BDRK",
+                    field_type="DOUBLE",
+                    field_is_nullable="NULLABLE",
+                    field_is_required="NON_REQUIRED"
+                )
+                arcpy.management.CalculateField(
+                    in_table=updateBhPoint,
+                    field="MGS_DEPTH_2_BDRK",
+                    expression=f'!{bdrkField}!'
+                )
+                newBdrkField = "MGS_DEPTH_2_BDRK"
+            else:
+                newBdrkField = bdrkField
+        else:
+            pass
     for xsec in allValues:
         uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
         intervalBoreholes = XSEC_BoreholesIntervals.boreholeIntervals(
             lines=lines,
             xsec=xsec,
-            dem=arcpy.GetParameterAsText(1),
+            dem=surfRaster,
             elevUnits=arcpy.GetParameterAsText(8),
             elevField=newElevField,
-            wellPoints=xsecPoints,
+            wellPoints=updateBhPoint,
             buff=arcpy.GetParameterAsText(13),
             ve=arcpy.GetParameterAsText(14),
             outGDB=arcpy.GetParameterAsText(16),
             stickType=arcpy.GetParameterAsText(12),
-            intervalTable=xsecInterval,
+            intervalTable=updateIntTable,
             depth_top="DEPTH_TOP",
             depth_bot="DEPTH"
         )
@@ -311,7 +171,7 @@ if __name__ == "__main__":
         profile_view = XSEC_Profiles.profileViews(
             xsecLine=lines,
             xsecName=xsec,
-            raster=arcpy.GetParameterAsText(1),
+            raster=surfRaster,
             ve=arcpy.GetParameterAsText(14),
             elev_units=arcpy.GetParameterAsText(8),
             outGDB=arcpy.GetParameterAsText(16)
@@ -334,22 +194,28 @@ if __name__ == "__main__":
             uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
             rasterPolys = arcpy.ValueTable(3)
             rasterPolys.loadFromString(arcpy.GetParameterAsText(9))
+
             for i in range(0, rasterPolys.rowCount):
                 raster = rasterPolys.getValue(i, 0)
                 year1 = rasterPolys.getValue(i, 1)
                 year2 = rasterPolys.getValue(i, 2)
 
+                projectGWLRaster = uf.xsec.rasterProject_GeoProj(
+                    surfRaster=raster,
+                    lines=lines,
+                    scratchDir=scratchDir
+                )
                 uf.management.AddMsgAndPrint(" - Producing confidence polygon for {} surface...".format(os.path.splitext(os.path.basename(raster))[0]))
-                featExtent = os.path.join(scratchDir,"RasterExtent_{}".format(os.path.splitext(os.path.basename(raster))[0]))
-                arcpy.ddd.RasterDomain(raster,featExtent,"POLYGON")
+                featExtent = os.path.join(scratchDir,"RasterExtent")
+                arcpy.ddd.RasterDomain(projectGWLRaster,featExtent,"POLYGON")
                 if (year1 == "" and year2 == ""):
-                    buffWW = os.path.join(scratchDir,os.path.basename(xsecPoints)+"_{}_buff_AllYears".format(arcpy.GetParameterAsText(13).replace(" ","")))
-                    arcpy.analysis.Buffer(xsecPoints,buffWW,"{}".format(arcpy.GetParameterAsText(13)),"FULL","ROUND","ALL",None,"PLANAR")
-                    unionWW = os.path.join(scratchDir, os.path.basename(xsecPoints) + "_{}_Union_AllYears".format(
+                    buffWW = os.path.join(scratchDir,os.path.basename(updateBhPoint)+"_{}_buff_AllYears".format(arcpy.GetParameterAsText(13).replace(" ","")))
+                    arcpy.analysis.Buffer(updateBhPoint,buffWW,"{}".format(arcpy.GetParameterAsText(13)),"FULL","ROUND","ALL",None,"PLANAR")
+                    unionWW = os.path.join(scratchDir, os.path.basename(updateBhPoint) + "_{}_Union_AllYears".format(
                         arcpy.GetParameterAsText(13).replace(" ", "")))
                     inFeatures = [featExtent,buffWW]
                     arcpy.analysis.Union(inFeatures,unionWW,"ONLY_FID",None,"GAPS")
-                    confidenceZone = os.path.join(scratchDir,os.path.basename(raster) + "_ConZone")
+                    confidenceZone = os.path.join(scratchDir,"Raster_ConZone")
                     arcpy.management.CopyFeatures(unionWW,confidenceZone)
                     arcpy.management.AddField(
                         in_table=confidenceZone,
@@ -360,8 +226,8 @@ if __name__ == "__main__":
                         field_is_required="NON_REQUIRED"
                     )
                     with arcpy.da.UpdateCursor(confidenceZone,
-                                               ["FID_{}".format(uf.management.limitString(os.path.splitext(os.path.basename(featExtent))[0],60)),
-                                                "FID_{}".format(uf.management.limitString(os.path.splitext(os.path.basename(buffWW))[0],60)),
+                                               ["FID_{}".format(uf.management.limitString(os.path.splitext(os.path.basename(featExtent))[0],128)),
+                                                "FID_{}".format(uf.management.limitString(os.path.splitext(os.path.basename(buffWW))[0],128)),
                                                 "CONFIDENCE"]) as cursor:
                         for row in cursor:
                             if row[0] == -1:
@@ -375,20 +241,20 @@ if __name__ == "__main__":
                         del row, cursor
                 else:
                     gwlPoints = arcpy.management.SelectLayerByAttribute(
-                        in_layer_or_view=xsecPoints,
+                        in_layer_or_view=updateBhPoint,
                         selection_type="NEW_SELECTION",
                         where_clause="{0} >= timestamp '{1}-01-01 00:00:00' And {0} <= timestamp '{2}-12-31 00:00:00'".format(newConstDateField,year1,year2),
                         invert_where_clause=None
                     )
-                    buffWW = os.path.join(scratchDir, os.path.basename(xsecPoints) + "_{}_buff_{}_{}".format(
+                    buffWW = os.path.join(scratchDir, os.path.basename(updateBhPoint) + "_{}_buff_{}_{}".format(
                         arcpy.GetParameterAsText(13).replace(" ", ""),year1,year2))
                     arcpy.analysis.Buffer(gwlPoints, buffWW, "{}".format(arcpy.GetParameterAsText(13)), "FULL", "ROUND",
                                           "ALL", None, "PLANAR")
-                    unionWW = os.path.join(scratchDir, os.path.basename(xsecPoints) + "_{}_Union_AllYears".format(
+                    unionWW = os.path.join(scratchDir, os.path.basename(updateBhPoint) + "_{}_Union_AllYears".format(
                         arcpy.GetParameterAsText(13).replace(" ", "")))
                     inFeatures = [featExtent, buffWW]
                     arcpy.analysis.Union(inFeatures, unionWW, "ONLY_FID", None, "GAPS")
-                    confidenceZone = os.path.join(scratchDir, os.path.basename(raster) + "_ConZone")
+                    confidenceZone = os.path.join(scratchDir, "Raster_ConZone")
                     arcpy.management.CopyFeatures(unionWW, confidenceZone)
                     arcpy.management.AddField(
                         in_table=confidenceZone,
@@ -400,9 +266,9 @@ if __name__ == "__main__":
                     )
                     with arcpy.da.UpdateCursor(confidenceZone,
                                                ["FID_{}".format(uf.management.limitString(
-                                                   os.path.splitext(os.path.basename(featExtent))[0], 60)),
+                                                   os.path.splitext(os.path.basename(featExtent))[0], 128)),
                                                 "FID_{}".format(uf.management.limitString(
-                                                    os.path.splitext(os.path.basename(buffWW))[0], 60)),
+                                                    os.path.splitext(os.path.basename(buffWW))[0], 128)),
                                                 "CONFIDENCE"]) as cursor:
                         for row in cursor:
                             if row[0] == -1:
@@ -418,7 +284,7 @@ if __name__ == "__main__":
                     xsecLine=lines,
                     xsec=xsec,
                     ve=arcpy.GetParameterAsText(14),
-                    raster=raster,
+                    raster=projectGWLRaster,
                     elev_units=arcpy.GetParameterAsText(8),
                     polygon=confidenceZone,
                     outGDB=arcpy.GetParameterAsText(16)
@@ -468,25 +334,29 @@ if __name__ == "__main__":
         uf.management.AddMsgAndPrint("BEGIN BEDROCK SURFACE PROFILE...")
         for xsec in allValues:
             uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
-            if bdrkDepthField in [f.name for f in arcpy.ListFields(updateBhPoint)]:
+            projectBDRKRaster = uf.xsec.rasterProject_GeoProj(
+                surfRaster=arcpy.GetParameterAsText(10),
+                lines=lines,
+                scratchDir=scratchDir
+            )
+            if newBdrkField in [f.name for f in arcpy.ListFields(updateBhPoint)]:
                 uf.management.AddMsgAndPrint(" - Producing confidence polygon for bedrock surface...")
-                featExtent = os.path.join(scratchDir,
-                                          "RasterExtent_{}".format(os.path.splitext(os.path.basename(arcpy.GetParameterAsText(10)))[0]))
-                arcpy.ddd.RasterDomain(arcpy.GetParameterAsText(10), featExtent, "POLYGON")
+                featExtent = os.path.join(scratchDir,"RasterExtent")
+                arcpy.ddd.RasterDomain(projectBDRKRaster, featExtent, "POLYGON")
                 bdrkPoints = arcpy.management.SelectLayerByAttribute(
-                    in_layer_or_view=xsecPoints,
+                    in_layer_or_view=updateBhPoint,
                     selection_type="NEW_SELECTION",
-                    where_clause="{} > 0".format(bdrkDepthField),
+                    where_clause="{} > 0".format(newBdrkField),
                     invert_where_clause=None
                 )
-                buffWW = os.path.join(scratchDir, os.path.basename(xsecPoints) + "_{}_buff_BDRK".format(arcpy.GetParameterAsText(13).replace(" ", "")))
+                buffWW = os.path.join(scratchDir, os.path.basename(updateBhPoint) + "_{}_buff_BDRK".format(arcpy.GetParameterAsText(13).replace(" ", "")))
                 arcpy.analysis.Buffer(bdrkPoints, buffWW, "{}".format(arcpy.GetParameterAsText(13)), "FULL", "ROUND",
                                       "ALL", None, "PLANAR")
-                unionWW = os.path.join(scratchDir, os.path.basename(xsecPoints) + "_{}_Union_BDRK".format(
+                unionWW = os.path.join(scratchDir, os.path.basename(updateBhPoint) + "_{}_Union_BDRK".format(
                     arcpy.GetParameterAsText(13).replace(" ", "")))
                 inFeatures = [featExtent, buffWW]
                 arcpy.analysis.Union(inFeatures, unionWW, "ONLY_FID", None, "GAPS")
-                confidenceZone = os.path.join(scratchDir, os.path.basename(raster) + "_ConZone")
+                confidenceZone = os.path.join(scratchDir, "Raster_ConZone")
                 arcpy.management.CopyFeatures(unionWW, confidenceZone)
                 arcpy.management.AddField(
                     in_table=confidenceZone,
@@ -498,9 +368,9 @@ if __name__ == "__main__":
                 )
                 with arcpy.da.UpdateCursor(confidenceZone,
                                            ["FID_{}".format(uf.management.limitString(
-                                               os.path.splitext(os.path.basename(featExtent))[0], 60)),
+                                               os.path.splitext(os.path.basename(featExtent))[0], 128)),
                                                "FID_{}".format(uf.management.limitString(
-                                                   os.path.splitext(os.path.basename(buffWW))[0], 60)),
+                                                   os.path.splitext(os.path.basename(buffWW))[0], 128)),
                                                "CONFIDENCE"]) as cursor:
                     for row in cursor:
                         if row[0] == -1:
@@ -516,7 +386,7 @@ if __name__ == "__main__":
                     xsecLine=lines,
                     xsec=xsec,
                     ve=arcpy.GetParameterAsText(14),
-                    raster=arcpy.GetParameterAsText(10),
+                    raster=projectBDRKRaster,
                     elev_units=arcpy.GetParameterAsText(8),
                     polygon=confidenceZone,
                     outGDB=arcpy.GetParameterAsText(16)
@@ -531,7 +401,7 @@ if __name__ == "__main__":
                 bdrkProfile = XSEC_Profiles.profileViews(
                     xsecLine=lines,
                     xsecName=xsec,
-                    raster=arcpy.GetParameterAsText(10),
+                    raster=projectBDRKRaster,
                     ve=arcpy.GetParameterAsText(14),
                     elev_units=arcpy.GetParameterAsText(8),
                     outGDB=arcpy.GetParameterAsText(16)
@@ -548,7 +418,7 @@ if __name__ == "__main__":
 
             bdrkLayer = xsecMap.listLayers(os.path.splitext(os.path.basename(bdrkProfile))[0])[0]
 
-            if bdrkDepthField in [f.name for f in arcpy.ListFields(updateBhPoint)]:
+            if newBdrkField in [f.name for f in arcpy.ListFields(updateBhPoint)]:
                 # Bedrock symbology...
                 symBDRK = bdrkLayer.symbology
                 symBDRK.updateRenderer("UniqueValueRenderer")
@@ -587,12 +457,12 @@ if __name__ == "__main__":
         uf.management.AddMsgAndPrint("BEGIN EXTRA SURFACE PROFILE(S)...")
         for xsec in allValues:
             uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
-            for rasterSurf in arcpy.GetParameterAsText(11).split(";"):
-                uf.management.AddMsgAndPrint(" - Processing {}...".format(rasterSurf))
+            for rasterSurf2 in arcpy.GetParameterAsText(11).split(";"):
+                uf.management.AddMsgAndPrint(" - Processing {}...".format(rasterSurf2))
                 profile_view = XSEC_Profiles.profileViews(
                     xsecLine=lines,
                     xsecName=xsec,
-                    raster=rasterSurf,
+                    raster=rasterSurf2,
                     ve=arcpy.GetParameterAsText(14),
                     elev_units=arcpy.GetParameterAsText(8),
                     outGDB=arcpy.GetParameterAsText(16)
@@ -652,7 +522,7 @@ if __name__ == "__main__":
                 xsecLine=lines,
                 xsecName=xsec,
                 elevation=arcpy.GetParameterAsText(8),
-                surfRaster=arcpy.GetParameterAsText(1),
+                surfRaster=surfRaster,
                 bdrkRaster=arcpy.GetParameterAsText(10),
                 maxBH_elev=surfElev_Max,
                 maxDepthElev=depthElev_Max,
@@ -792,6 +662,6 @@ if __name__ == "__main__":
         '***FINISHED CREATING CROSS-SECTION DATASETS UTILIZING THE SCHEMA DETAILED BY THE MICHIGAN GEOLOGICAL SURVEY***')
     uf.management.AddMsgAndPrint(" - Final cleaning of default geodatabse...")
     if demSR.name == linesSR.name:
-        arcpy.management.Delete([updateBhPoint,updateIntTable,routeWells,xsecInterval,xsecPoints])
+        arcpy.management.Delete([updateBhPoint,updateIntTable])
     else:
-        arcpy.management.Delete([updateBhPoint, updateIntTable, routeWells, xsecInterval, xsecPoints, newLines])
+        arcpy.management.Delete([updateBhPoint, updateIntTable, newLines])

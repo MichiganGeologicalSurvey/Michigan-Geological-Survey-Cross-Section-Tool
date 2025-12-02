@@ -3,7 +3,7 @@
 # XSEC_Boreholes.py
 # Version: 1.0
 # Date: 7/9/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place borehole sticks onto a cross-sectional view.
 # *****************************************************
@@ -25,7 +25,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_Boreholes.py, Version 1.2.5"
+version = "XSEC_Boreholes.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_Boreholes.py"
 uf.management.githubVersion(
     vString=version,
@@ -64,14 +64,12 @@ def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,bu
     rProps = "rkey POINT M fmp"
     eventTableWells = uf.xsec.locateEvents_Table(
         pts=zWells,
-        rasterDEM=surfDEM,
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
         route_line=zm_line,
         checkField=id_checkField,
         sel_dist=buff,
-        event_props=rProps,
-        z_type="Z"
+        event_props=rProps
     )
     eventLayerWells = "XSEC_{}_Events".format(xsec)
     arcpy.lr.MakeRouteEventLayer(zm_line, id_checkField, eventTableWells, rProps, eventLayerWells, "#", "#",
@@ -106,7 +104,13 @@ def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,bu
     return bhStick,bhLines
 
 if __name__ == "__main__":
+    uf.management.AddMsgAndPrint(" -- Pre-Cross-Section Checks -- ")
     lines = arcpy.GetParameterAsText(0)
+    surfRaster = uf.xsec.rasterProject_GeoProj(
+        surfRaster=arcpy.GetParameterAsText(1),
+        lines=lines,
+        scratchDir=scratchDir
+    )
     allValues = uf.management.unique_values(table=lines, field="XSEC")
     # Create the cross-section maps if they do not exist already
     mapList = []
@@ -128,102 +132,30 @@ if __name__ == "__main__":
         outFDS = os.path.join(arcpy.GetParameterAsText(9),FDSname)
         if not arcpy.Exists(outFDS):
             arcpy.management.CreateFeatureDataset(arcpy.GetParameterAsText(9),FDSname,unknown)
-    try:
-        updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(
-            os.path.splitext(os.path.basename(arcpy.GetParameterAsText(2)))[0]))
-        uf.management.testAndDelete(updateBhPoint)
-    except:
-        updateBhPoint = os.path.join(scratchDir, "{}_BH_MGS".format(arcpy.GetParameterAsText(2).replace(" ","_")))
 
-    uf.management.AddMsgAndPrint(" - Extracting elevation measurements from DEM...")
-    featExtent = os.path.join(scratchDir, "RasterArea_{}".format(
-        os.path.splitext(os.path.basename(arcpy.GetParameterAsText(1)))[0]))
-    uf.management.testAndDelete(featExtent)
-    arcpy.ddd.RasterDomain(arcpy.GetParameterAsText(1), featExtent, "POLYGON")
-    locationsOutside = arcpy.management.SelectLayerByLocation(
-        in_layer=arcpy.GetParameterAsText(2),
-        overlap_type="WITHIN",
-        select_features=featExtent,
-        selection_type="NEW_SELECTION",
-        invert_spatial_relationship="INVERT"
+    uf.management.AddMsgAndPrint("-----------------------------")
+    uf.management.AddMsgAndPrint("BEGIN CREATING BOREHOLE STICKS...")
+    updateBhPoint, updateIntTable, newIdField, newElevField, newWellDepth, newTopDepthField, newBotDepthField = uf.xsec.pointsNearLine(
+        custom=arcpy.GetParameterAsText(3),
+        points=arcpy.GetParameterAsText(2),
+        raster=surfRaster,
+        int_table=None,
+        xsecline=lines,
+        searchDist=arcpy.GetParameterAsText(6),
+        parm_bhFields=arcpy.GetParameterAsText(4),
+        parm_intFields=None,
+        scratchDir=scratchDir
     )
-    if int(arcpy.management.GetCount(locationsOutside)[0]) > 10:
-        arcpy.management.Delete([featExtent])
-        arcpy.management.SelectLayerByAttribute(
-            in_layer_or_view=arcpy.GetParameterAsText(2),
-            selection_type="CLEAR_SELECTION"
-        )
-        uf.management.AddMsgAndPrint(
-            "Too many locations outside the raster boundary (Limit: 10). Please review the wells and select only the records inside the defined DEM.",
-            2)
-        quit()
-    else:
-        arcpy.management.Delete([featExtent])
-        arcpy.management.SelectLayerByAttribute(
-            in_layer_or_view=arcpy.GetParameterAsText(2),
-            selection_type="CLEAR_SELECTION"
-        )
-    arcpy.sa.ExtractValuesToPoints(
-        in_point_features=arcpy.GetParameterAsText(2),
-        in_raster=arcpy.GetParameterAsText(1),
-        out_point_features=updateBhPoint
-    )
-    arcpy.management.AddField(
-        in_table=updateBhPoint,
-        field_name="DEM_ELEV",
-        field_type="DOUBLE",
-        field_is_nullable="NULLABLE",
-        field_is_required="NON_REQUIRED"
-    )
-    arcpy.management.CalculateField(
-        in_table=updateBhPoint,
-        field="DEM_ELEV",
-        expression='!RASTERVALU!'
-    )
-    arcpy.management.DeleteField(updateBhPoint,["RASTERVALU"])
-    if arcpy.GetParameterAsText(3) == "true":
-        bhFields = arcpy.ValueTable(3)
-        bhFields.loadFromString(arcpy.GetParameterAsText(4))
-        idField = bhFields.getValue(0,0)
-        depthField = bhFields.getValue(0,1)
-        elevField = bhFields.getValue(0,2)
 
-        arcpy.management.CopyFeatures(arcpy.GetParameterAsText(2),updateBhPoint)
-        arcpy.management.AlterField(
-            in_table=updateBhPoint,
-            field=idField,
-            new_field_name="WELLID"
-        )
-        arcpy.management.AlterField(
-            in_table=updateBhPoint,
-            field=depthField,
-            new_field_name="WELL_DEPTH"
-        )
-        if elevField == "":
-            newElevField = ""
-        else:
-            newElevField = elevField
-    else:
-        newElevField = "DEM_ELEV"
-    wellIds = []
-    with arcpy.da.SearchCursor(updateBhPoint, ["WELLID"]) as cursor:
-        for row in cursor:
-            wellIds.append(row[0])
-        del row, cursor
-    routeLiths = arcpy.management.SelectLayerByAttribute(
-        in_layer_or_view=updateBhPoint,
-        selection_type="ADD_TO_SELECTION",
-        where_clause="WELLID IN {}".format(wellIds).replace("[", "(").replace("]", ")"),
-        invert_where_clause=None)
     for xsec in allValues:
         uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
         finalBorehole,bhLines = boreholeSticks(
             lineFeature=lines,
             xsec=xsec,
-            surfDEM=arcpy.GetParameterAsText(1),
+            surfDEM=surfRaster,
             elev_units=arcpy.GetParameterAsText(5),
             elev_field=newElevField,
-            well_points=routeLiths,
+            well_points=updateBhPoint,
             buff=arcpy.GetParameterAsText(6),
             ve=arcpy.GetParameterAsText(7),
             outGDB=arcpy.GetParameterAsText(9),

@@ -3,7 +3,7 @@
 # XSEC_Profiles.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place profiles onto a cross-sectional view.
 # *****************************************************
@@ -25,7 +25,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_Profiles.py, Version 1.2.5"
+version = "XSEC_Profiles.py, Version 1.2.6"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_Profiles.py"
 uf.management.githubVersion(
     vString=version,
@@ -40,7 +40,6 @@ def profileViews(xsecLine,xsecName,raster,ve,elev_units,outGDB):
         defaultGDB=scratchDir,
         raster_surface=raster
     )
-
     nameID = 1
     while True:
         profileName = "XSEC_{}_{}_{}x_v{}".format(
@@ -63,12 +62,12 @@ def profileViews(xsecLine,xsecName,raster,ve,elev_units,outGDB):
         profile=profilePath,
         id_field=id_checkField,
         elev_units=elev_units,
-        XSEC_NAME=xsecName,
-        adjust_dist=offset
+        XSEC_NAME=xsecName
     )
     return profilePath
 
 if __name__ == "__main__":
+    uf.management.AddMsgAndPrint(" -- Pre-Cross-Section Checks -- ")
     lines1 = arcpy.GetParameterAsText(0)
     allValues = uf.management.unique_values(table=lines1,field="XSEC")
     # Create the cross-section maps if they do not exist already
@@ -96,8 +95,13 @@ if __name__ == "__main__":
         uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
         for raster in rasterList:
             uf.management.AddMsgAndPrint(" - Processing {}...".format(raster))
+            surfRaster = uf.xsec.rasterProject_GeoProj(
+                surfRaster=raster,
+                lines=lines1,
+                scratchDir=scratchDir
+            )
             allValues = uf.management.unique_values(table=lines1, field="XSEC")
-            demSR = arcpy.Describe(raster).spatialReference
+            demSR = arcpy.Describe(surfRaster).spatialReference
             linesSR = arcpy.Describe(lines1).spatialReference
             if demSR.name == linesSR.name:
                 lines = lines1
@@ -108,7 +112,7 @@ if __name__ == "__main__":
             profile_view = profileViews(
                 xsecLine=lines,
                 xsecName=xsec,
-                raster=raster,
+                raster=surfRaster,
                 ve=arcpy.GetParameterAsText(3),
                 elev_units=arcpy.GetParameterAsText(2),
                 outGDB=arcpy.GetParameterAsText(4)

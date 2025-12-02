@@ -3,7 +3,7 @@
 # Utility_Functions.py
 # Version: 1.0
 # Date: 5/30/2024
-# Last Modified Date: 9/22/2025
+# Last Modified Date: 12/2/2025
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A utility functions python file to store generic definitions and functions related to other main software scripts.
 # *****************************************************
@@ -684,17 +684,21 @@ class xsec:
             ctg = ctg + 360
             return ctg
 
-    def locateEvents_Table(pts, rasterDEM, XSEC_NAME, defaultGDB, route_line, checkField,sel_dist, event_props, z_type, is_lines=False):
+    def locateEvents_Table(pts, XSEC_NAME, defaultGDB, route_line, checkField,sel_dist, event_props, is_lines=False):
         # Used to locate the points that are within the distance of the cross-section line. Can be used to locate
         # boreholes, open holes, and points of interest on or near the cross-section line.
-        desc = arcpy.da.Describe(pts)
-        if not desc["hasZ"]:
-            arcpy.ddd.AddSurfaceInformation(pts,rasterDEM, z_type,"LINEAR")
         dupDetectField = "xDupDetect"
         arcpy.management.AddField(pts, dupDetectField, "LONG")
         eventLocTable = os.path.join(defaultGDB,"XSEC_{}_locEvents".format(XSEC_NAME))
         management.testAndDelete(eventLocTable)
-        arcpy.lr.LocateFeaturesAlongRoutes(pts,route_line,checkField,sel_dist,eventLocTable,event_props)
+        arcpy.lr.LocateFeaturesAlongRoutes(
+            in_features=pts,
+            in_routes=route_line,
+            route_id_field=checkField,
+            radius_or_tolerance=sel_dist,
+            out_table=eventLocTable,
+            out_event_properties=event_props
+        )
         nRows = int(arcpy.management.GetCount(eventLocTable)[0])
         nPts = int(arcpy.management.GetCount(pts)[0])
         if nRows > nPts and not is_lines:
@@ -707,7 +711,12 @@ class xsec:
         bhLineNames = "XSEC_{}_bhLines".format(XSEC_NAME)
         bhSticks = os.path.join(defaultGDB,bhLineNames)
         management.testAndDelete(bhSticks)
-        arcpy.management.CreateFeatureclass(defaultGDB,bhLineNames,"POLYLINE",locatedPoints,"DISABLED","SAME_AS_TEMPLATE")
+        arcpy.management.CreateFeatureclass(
+            out_path=defaultGDB,
+            out_name=bhLineNames,
+            geometry_type="POLYLINE",
+            template=locatedPoints
+        )
 
         lf = arcpy.ListFields(locatedPoints)
         bhFields = [f.name for f in lf if f.type != "Geometry"]
@@ -720,22 +729,22 @@ class xsec:
         cur = arcpy.da.InsertCursor(bhSticks,bhFields)
         oidName = [f.name for f in lf if f.type == "OID"][0]
         oid_i = tRows.fields.index(oidName)
-        elevID = tRows.fields.index("{}".format(elev_field))
-        depthID = tRows.fields.index("{}".format(depth_field))
+        elevID = tRows.fields.index(elev_field)
+        depthID = tRows.fields.index(depth_field)
+        mField = tRows.fields.index("M")
 
         i = 0
         for row in tRows:
             if elev_units == "Meters":
                 i = i + 1
-                geom = row[-1]
-                existPnt = geom[0]
                 bhArray = []
-                X = existPnt.M
+                X = row[mField]
                 Ytop = float(row[elevID])
                 Ybot = Ytop - float(row[depthID])
                 bhArray.append((X, Ytop * float(ve)))
                 bhArray.append((X, Ybot * float(ve)))
                 vals = list(row).copy()
+                print(vals)
                 vals.append("")
                 vals[-2] = bhArray
                 csAzi = xsec.cartesianToGeographic(angle=row[tRows.fields.index("LOC_ANGLE")])
@@ -745,15 +754,13 @@ class xsec:
                 try:
                     cur.insertRow(vals)
                     bhArray.clear()
-                except Exception as e:
+                except Exception:
                     management.AddMsgAndPrint("Could not create feature from objectid {} in {}".format(row[oid_i],locatedPoints),1)
-                    management.AddMsgAndPrint(e)
+                    management.AddMsgAndPrint(Exception)
             if elev_units == "Feet":
                 i = i + 1
-                geom = row[-1]
-                existPnt = geom[0]
                 bhArray = []
-                X = existPnt.M
+                X = row[mField]
                 Ytop = float(row[elevID]) * 0.3048
                 Ybot = Ytop - float(row[depthID]) * 0.3048
                 bhArray.append((X, Ytop * float(ve)))
@@ -768,9 +775,9 @@ class xsec:
                 try:
                     cur.insertRow(vals)
                     bhArray.clear()
-                except Exception as e:
+                except Exception:
                     management.AddMsgAndPrint("Could not create feature from objectid {} in {}".format(row[oid_i], locatedPoints), 1)
-                    management.AddMsgAndPrint(e)
+                    management.AddMsgAndPrint(f"{Exception}")
             del row
         del tRows, cur
         return bhSticks
@@ -826,7 +833,6 @@ class xsec:
                 X = row[tRows.fields.index("M")]
                 Ytop = float(row[elevID]) * 0.3048
                 surfPnt = [float(X),float(Ytop* float(ve))]
-                management.AddMsgAndPrint(surfPnt)
                 vals = list(row).copy()
                 vals.append("{}_{}".format(id_pref, i))
                 vals[-2] = surfPnt
@@ -855,7 +861,7 @@ class xsec:
         else:
             pass
 
-    def plan2side(zm_line,ve,profile,id_field,elev_units,XSEC_NAME,adjust_dist):
+    def plan2side(zm_line,ve,profile,id_field,elev_units,XSEC_NAME):
         fldOBJ = arcpy.ListFields(zm_line)
         flds = [f.name for f in fldOBJ if f.type != "Geometry"]
         flds.append("SHAPE@")
@@ -877,7 +883,7 @@ class xsec:
                 array = []
                 line = row[-1]
                 for pnt in line[0]:
-                    X = pnt.M + float(adjust_dist)
+                    X = pnt.M
                     Y = pnt.Z
                     array.append((X,Y * float(ve)))
                 vals[-2] = array
@@ -891,7 +897,7 @@ class xsec:
                 array = []
                 line = row[-1]
                 for pnt in line[0]:
-                    X = pnt.M + float(adjust_dist)
+                    X = pnt.M
                     Y = pnt.Z * 0.3048
                     array.append((X, Y * float(ve)))
                 vals[-2] = array
@@ -1029,3 +1035,216 @@ class xsec:
         # Note for later: To display the path to the file in arcpy, define the message as :f'<a href="{file_path}">Open this file</a'
         # File path = "file:///C:/path/to/your/file.text"
         return gammaRay_table
+
+    def pointsNearLine(custom,points,raster,int_table,xsecline,searchDist,parm_bhFields,parm_intFields,scratchDir):
+        management.AddMsgAndPrint("* Locating wells near cross-section line(s)...")
+        # First, we need to find the wells that are located in the search radius. Once selected, we will take all
+        # those Well ID values and add them to a list to grab the corresponding table intervals.
+        wellIds = []
+        locations = arcpy.management.SelectLayerByLocation(
+            in_layer=points,
+            overlap_type="WITHIN_A_DISTANCE",
+            select_features=xsecline,
+            search_distance=searchDist,
+            selection_type="NEW_SELECTION"
+        )
+        with arcpy.da.SearchCursor(locations, ["WELLID"]) as cursor:
+            for row in cursor:
+                wellIds.append(row[0])
+            del row, cursor
+        xsecPoints = os.path.join(scratchDir, "LocalPoints_BH_MGS")
+        management.testAndDelete(xsecPoints)
+        with arcpy.EnvManager(maintainAttachments="NOT_MAINTAIN_ATTACHEMENTS", preserveGlobalIds=True):
+            arcpy.management.CopyFeatures(
+                in_features=locations,
+                out_feature_class=xsecPoints
+            )
+        arcpy.management.SelectLayerByAttribute(
+            in_layer_or_view=points,
+            selection_type="CLEAR_SELECTION"
+        )
+        if int_table is None:
+            xsecInterval = None
+            pass
+        else:
+            xsecInterval = os.path.join(scratchDir, "LocalPoints_INT_MGS")
+            management.testAndDelete(xsecInterval)
+            routeWellsInt = arcpy.management.SelectLayerByAttribute(
+                in_layer_or_view=int_table,
+                selection_type="ADD_TO_SELECTION",
+                where_clause="WELLID IN {}".format(wellIds).replace("[", "(").replace("]", ")"),
+                invert_where_clause=None)
+            with arcpy.EnvManager(maintainAttachments="NOT_MAINTAIN_ATTACHEMENTS", preserveGlobalIds=True):
+                arcpy.management.CopyRows(
+                    in_rows=routeWellsInt,
+                    out_table=xsecInterval
+                )
+            arcpy.management.SelectLayerByAttribute(int_table, "CLEAR_SELECTION")
+
+        # Now, we will prepare the trimmed down version of the boreholes so that it is only processing the points along
+        # the line
+        management.AddMsgAndPrint("* Extracting elevation measurements from DEM...")
+        arcpy.ddd.AddSurfaceInformation(
+            in_feature_class=xsecPoints,
+            in_surface=raster,
+            out_property="Z",
+            method="BILINEAR",
+            sample_distance=None,
+            z_factor=1,
+            pyramid_level_resolution=0,
+            noise_filtering=""
+        )
+        arcpy.management.AddField(
+            in_table=xsecPoints,
+            field_name="DEM_ELEV",
+            field_type="DOUBLE",
+            field_is_nullable="NULLABLE",
+            field_is_required="NON_REQUIRED"
+        )
+        arcpy.management.CalculateField(
+            in_table=xsecPoints,
+            field="DEM_ELEV",
+            expression='!Z!'
+        )
+        arcpy.management.DeleteField(xsecPoints, ["Z"])
+        with arcpy.da.UpdateCursor(xsecPoints, ["DEM_ELEV"]) as cursor:
+            for row in cursor:
+                if row[0] is None:
+                    cursor.deleteRow()
+            del row, cursor
+        management.AddMsgAndPrint("* Formatting and finding required fields (local copy)...")
+        if custom == "true":
+            bhFields = arcpy.ValueTable(3)
+            bhFields.loadFromString(parm_bhFields)
+            idField = bhFields.getValue(0, 0)
+            depthField = bhFields.getValue(0, 1)
+            elevField = bhFields.getValue(0, 2)
+
+            newTopDepthField = None
+            newBotDepthField = None
+
+            if int_table == "":
+                pass
+            else:
+                intervFields = arcpy.ValueTable(3)
+                intervFields.loadFromString(parm_intFields)
+                interIdField = intervFields.getValue(0, 0)
+                topDepthField = intervFields.getValue(0, 1)
+                botDepthField = intervFields.getValue(0, 2)
+
+                with arcpy.da.UpdateCursor(xsecInterval, [botDepthField, topDepthField]) as cursor:
+                    for row in cursor:
+                        if (row[0] == 0 and row[1] == 0):
+                            cursor.deleteRow()
+                        else:
+                            pass
+                    del row, cursor
+                try:
+                    arcpy.management.AlterField(
+                        in_table=xsecInterval,
+                        field=interIdField,
+                        new_field_name="WELLID"
+                    )
+                except:
+                    pass
+                try:
+                    arcpy.management.AlterField(
+                        in_table=xsecInterval,
+                        field=topDepthField,
+                        new_field_name="DEPTH_TOP"
+                    )
+                    newTopDepthField = "DEPTH_TOP"
+                except:
+                    pass
+                try:
+                    arcpy.management.AlterField(
+                        in_table=xsecInterval,
+                        field=botDepthField,
+                        new_field_name="BOT_DEPTH"
+                    )
+                    newBotDepthField = "BOT_DEPTH"
+                except:
+                    newBotDepthField = "DEPTH"
+                if "DEPTH_TOP" in [f.name for f in arcpy.ListFields(xsecInterval)]:
+                    pass
+                else:
+                    arcpy.management.AddField(
+                        in_table=xsecInterval,
+                        field_name="DEPTH_TOP",
+                        field_type="DOUBLE",
+                        field_is_nullable="NULLABLE",
+                        field_is_required="NON_REQUIRED"
+                    )
+                    arcpy.management.CalculateField(
+                        in_table=xsecInterval,
+                        field="DEPTH_TOP",
+                        expression='!DEPTH! - !THICKNESS!'
+                    )
+                    with arcpy.da.UpdateCursor(xsecInterval, ["DEPTH", "DEPTH_TOP"]) as cursor:
+                        for row in cursor:
+                            if (row[0] == 0 and row[1] == 0):
+                                cursor.deleteRow()
+                            else:
+                                pass
+                        del row, cursor
+            try:
+                arcpy.management.AlterField(
+                    in_table=xsecPoints,
+                    field=idField,
+                    new_field_name="WELLID"
+                )
+            except:
+                pass
+            try:
+                arcpy.management.AlterField(
+                    in_table=xsecPoints,
+                    field=depthField,
+                    new_field_name="WELL_DEPTH"
+                )
+            except:
+                pass
+            if elevField == "":
+                newElevField = "DEM_ELEV"
+            else:
+                newElevField = elevField
+        else:
+            newElevField = "DEM_ELEV"
+            newTopDepthField = "DEPTH_TOP"
+            newBotDepthField = "DEPTH"
+
+        return xsecPoints,xsecInterval,"WELLID",newElevField,"WELL_DEPTH",newTopDepthField,newBotDepthField
+
+    def rasterProject_GeoProj(surfRaster,lines,scratchDir):
+        rasterSR = arcpy.Describe(surfRaster).spatialReference
+        if rasterSR.type == "Geographic":
+            management.AddMsgAndPrint("* Raster is in a geographic coordinate system. Reprojecting to area for cross-section view...")
+            with arcpy.EnvManager(
+                    extent=arcpy.Describe(lines).extent):
+                arcpy.management.ProjectRaster(
+                    in_raster=surfRaster,
+                    out_raster=os.path.join(scratchDir,"Raster_Project"),
+                    out_coor_system=arcpy.SpatialReference(102100),
+                    resampling_type="NEAREST",
+                    cell_size="",
+                    geographic_transform=None,
+                    Registration_Point=None
+                )
+            outRaster = os.path.join(scratchDir,"Raster_Project")
+        else:
+            rasterUnits = str(rasterSR.linearUnitName)
+            if rasterUnits != "Meters":
+                management.AddMsgAndPrint("* Raster's linear units are not in meters. Reprojecting to area for cross-section view...")
+                with arcpy.EnvManager(extent=arcpy.Describe(lines).extent):
+                    arcpy.management.ProjectRaster(
+                        in_raster=surfRaster,
+                        out_raster=os.path.join(scratchDir, "Raster_Project"),
+                        out_coor_system=arcpy.SpatialReference(102100),
+                        resampling_type="NEAREST",
+                        cell_size="",
+                        geographic_transform=None,
+                        Registration_Point=None
+                    )
+                outRaster = os.path.join(scratchDir, "Raster_Project")
+            else:
+                outRaster = surfRaster
+        return outRaster
