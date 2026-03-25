@@ -3,7 +3,7 @@
 # XSEC_GammaRay.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and project gamma ray data from wells onto a cross-sectional view.
 # *****************************************************
@@ -26,7 +26,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_GammaRay.py, Version 1.2.6"
+version = "XSEC_GammaRay.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_GammaRay.py"
 uf.management.githubVersion(
     vString=version,
@@ -35,7 +35,7 @@ uf.management.githubVersion(
 uf.management.AddMsgAndPrint("-----------------------------")
 
 def gammaRay(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,wellid,wellidField,lasFile,buff,depthUnits,runAvg,ve,he,outGDB):
-    zm_line, offset, id_checkField = uf.xsec.zmLine_Generation(
+    zm_line, offset = uf.xsec.zmLine_Generation(
         lineFeature=lineFeature,
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
@@ -105,12 +105,12 @@ def gammaRay(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,wellid,w
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
         route_line=zm_line,
-        checkField=id_checkField,
+        checkField="XSEC",
         sel_dist=buff,
         event_props=rProps
     )
     eventLayerWells = "XSEC_{}_Events".format(xsec)
-    arcpy.lr.MakeRouteEventLayer(zm_line, id_checkField, eventTableWells, rProps, eventLayerWells, "#", "#",
+    arcpy.lr.MakeRouteEventLayer(zm_line, "XSEC", eventTableWells, rProps, eventLayerWells, "#", "#",
                                  "ANGLE_FIELD", "TANGENT")
     locPoints = os.path.join(scratchDir, "XSEC_{}_wellsLocated".format(xsec))
     arcpy.management.CopyFeatures(eventLayerWells, locPoints)
@@ -169,7 +169,7 @@ def gammaRay(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,wellid,w
     for data in tRows:
         if data[tRows.fields.index(wellidField)] == wellid:
             topElev = data[elevID]
-            mRoute = data[tRows.fields.index("M")]
+            mRoute = data[tRows.fields.index("M")] + float(offset)
             gammaArray = []
             for row in gRows:
                 X = (float(row[0]) * float(he)) + mRoute
@@ -267,9 +267,6 @@ if __name__ == "__main__":
                 [os.path.join(scratchDir, "XSEC_{}_zm".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                  os.path.join(scratchDir, "XSEC_{}_z".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                  wellFeature])
-            arcpy.management.DeleteField(lines,
-                                         ["ROUTEID",
-                                          "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
             xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
             if float(arcpy.management.GetCount(gammaStick)[0]) == 0:
                 uf.management.AddMsgAndPrint(

@@ -3,7 +3,7 @@
 # XSEC_QuickLines.py
 # Version: 1.2
 # Date: 8/6/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create quick cross-sectional views of the essential products, such as borehole
 # data, surface profiles, and grid lines.
@@ -30,7 +30,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_QuickLines.py, Version 1.2.6"
+version = "XSEC_QuickLines.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_QuickLines.py"
 uf.management.githubVersion(
     vString=version,
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     )
     demSR = arcpy.Describe(surfRaster).spatialReference
     linesSR = arcpy.Describe(arcpy.GetParameterAsText(0)).spatialReference
-    if demSR.name == linesSR.name:
+    if demSR.linearUnitName == linesSR.linearUnitName:
         lines = lines1
     else:
         newLines = os.path.join(scratchDir,"XSEC_Lines_Projection")
@@ -90,13 +90,13 @@ if __name__ == "__main__":
         parm_intFields=arcpy.GetParameterAsText(6),
         scratchDir=scratchDir
     )
+    newConstDateField = "CONST_DATE"
+    newBdrkField = "MGS_DEPTH_2_BDRK"
     if arcpy.GetParameterAsText(4) == "true":
         extraFields = arcpy.ValueTable(2)
         extraFields.loadFromString(arcpy.GetParameterAsText(7))
         constDateField = extraFields.getValue(0, 0)
         bdrkField = extraFields.getValue(0, 1)
-        newConstDateField = None
-        newBdrkField = None
         if (constDateField != "" and constDateField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
             if arcpy.ListFields(updateBhPoint, constDateField)[0].type != "Date":
                 arcpy.management.AddField(
@@ -113,7 +113,7 @@ if __name__ == "__main__":
                 )
                 newConstDateField = "CONST_DATE_2"
             else:
-                newConstDateField = "CONST_DATE"
+                pass
         else:
             pass
         if (bdrkField != "" and bdrkField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
@@ -130,7 +130,6 @@ if __name__ == "__main__":
                     field="MGS_DEPTH_2_BDRK",
                     expression=f'!{bdrkField}!'
                 )
-                newBdrkField = "MGS_DEPTH_2_BDRK"
             else:
                 newBdrkField = bdrkField
         else:
@@ -161,8 +160,6 @@ if __name__ == "__main__":
                           "XSEC_{}_wellsLocated".format(xsec)),
              os.path.join(scratchDir, "XSEC_{}_bhLines".format(xsec)),
              os.path.join(scratchDir, "XSEC_{}_zWells".format(xsec))])
-        arcpy.management.DeleteField(lines,
-                                     ["ROUTEID", "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
         xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
         xsecMap.addDataFromPath(intervalBoreholes)
         uf.management.AddMsgAndPrint("-----------------------------")
@@ -181,8 +178,6 @@ if __name__ == "__main__":
         arcpy.management.Delete(
             [os.path.join(scratchDir, "XSEC_{}_zm".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
              os.path.join(scratchDir, "XSEC_{}_z".format(os.path.splitext(os.path.basename(lines))[0], xsec))])
-        arcpy.management.DeleteField(lines, ["ROUTEID",
-                                             "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
         xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
         xsecMap.addDataFromPath(profile_view)
         uf.management.AddMsgAndPrint("-----------------------------")
@@ -295,8 +290,6 @@ if __name__ == "__main__":
                     [os.path.join(scratchDir, "XSEC_{}_zm".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                      os.path.join(scratchDir, "XSEC_{}_z".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                      buffWW,unionWW,confidenceZone,featExtent])
-                arcpy.management.DeleteField(lines, ["ROUTEID",
-                                                     "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
                 xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
                 xsecMap.addDataFromPath(segProfile)
 
@@ -346,7 +339,7 @@ if __name__ == "__main__":
                 bdrkPoints = arcpy.management.SelectLayerByAttribute(
                     in_layer_or_view=updateBhPoint,
                     selection_type="NEW_SELECTION",
-                    where_clause="{} > 0".format(newBdrkField),
+                    where_clause=f"{newBdrkField} > 0",
                     invert_where_clause=None
                 )
                 buffWW = os.path.join(scratchDir, os.path.basename(updateBhPoint) + "_{}_buff_BDRK".format(arcpy.GetParameterAsText(13).replace(" ", "")))
@@ -411,8 +404,6 @@ if __name__ == "__main__":
                 arcpy.management.Delete(
                     [os.path.join(scratchDir, "XSEC_{}_zm_{}".format(xsec,os.path.splitext(os.path.basename(lines))[0])),
                      os.path.join(scratchDir, "XSEC_{}_z".format(xsec))])
-            arcpy.management.DeleteField(lines, ["ROUTEID",
-                                                 "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
             xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
             xsecMap.addDataFromPath(bdrkProfile)
 
@@ -472,8 +463,6 @@ if __name__ == "__main__":
                 arcpy.management.Delete(
                     [os.path.join(scratchDir, "XSEC_{}_zm".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                      os.path.join(scratchDir, "XSEC_{}_z".format(os.path.splitext(os.path.basename(lines))[0], xsec))])
-                arcpy.management.DeleteField(lines, ["ROUTEID",
-                                                     "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
                 xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
                 xsecMap.addDataFromPath(profile_view)
                 uf.management.AddMsgAndPrint("-----------------------------")
@@ -538,8 +527,6 @@ if __name__ == "__main__":
             arcpy.management.Delete(
                 [os.path.join(scratchDir, "XSEC_{}_zm_{}".format(xsec, os.path.splitext(os.path.basename(lines))[0])),
                  os.path.join(scratchDir, "XSEC_{}_z".format(xsec))])
-            arcpy.management.DeleteField(lines, ["ROUTEID",
-                                                 "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
             xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
             xsecMap.addDataFromPath(frame)
             xsecMap.addDataFromPath(labels)
@@ -661,7 +648,7 @@ if __name__ == "__main__":
     uf.management.AddMsgAndPrint(
         '***FINISHED CREATING CROSS-SECTION DATASETS UTILIZING THE SCHEMA DETAILED BY THE MICHIGAN GEOLOGICAL SURVEY***')
     uf.management.AddMsgAndPrint(" - Final cleaning of default geodatabse...")
-    if demSR.name == linesSR.name:
+    if demSR.linearUnitName == linesSR.linearUnitName:
         arcpy.management.Delete([updateBhPoint,updateIntTable])
     else:
         arcpy.management.Delete([updateBhPoint, updateIntTable, newLines])

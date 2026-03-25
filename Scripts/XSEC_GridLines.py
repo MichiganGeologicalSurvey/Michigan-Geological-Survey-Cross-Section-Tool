@@ -3,7 +3,7 @@
 # XSEC_GridLines.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place gridded profiles onto a cross-sectional view.
 # *****************************************************
@@ -27,7 +27,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_GridLines.py, Version 1.2.6"
+version = "XSEC_GridLines.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_GridLines.py"
 uf.management.githubVersion(
     vString=version,
@@ -36,7 +36,7 @@ uf.management.githubVersion(
 uf.management.AddMsgAndPrint("-----------------------------")
 
 def gridProfile(xsecLine,xsecName,elevation,surfRaster,bdrkRaster,maxBH_elev,maxDepthElev,ve,elev_units,dist_units,elev_int,dist_int,outGDB):
-    zm_lineSURF,offsetSURF,id_checkField_SURF = uf.xsec.zmLine_Generation(
+    zm_lineSURF,offsetSURF = uf.xsec.zmLine_Generation(
         lineFeature=xsecLine,
         XSEC_NAME=xsecName,
         defaultGDB=scratchDir,
@@ -50,7 +50,7 @@ def gridProfile(xsecLine,xsecName,elevation,surfRaster,bdrkRaster,maxBH_elev,max
             lines=xsecLine,
             scratchDir=scratchDir
         )
-        zm_lineBDRK, offsetBDRK, id_checkField_BDRK = uf.xsec.zmLine_Generation(
+        zm_lineBDRK, offsetBDRK = uf.xsec.zmLine_Generation(
             lineFeature=xsecLine,
             XSEC_NAME=xsecName,
             defaultGDB=scratchDir,
@@ -60,7 +60,10 @@ def gridProfile(xsecLine,xsecName,elevation,surfRaster,bdrkRaster,maxBH_elev,max
     if bdrkRaster != "":
         bdrkDesc = arcpy.Describe(zm_lineBDRK)
     Xmin = 0
-    Xmax = topoDesc.extent.MMax
+    if bdrkRaster != "":
+        Xmax = max(topoDesc.extent.MMax + offsetSURF,bdrkDesc.extent.MMax + offsetBDRK)
+    else:
+        Xmax = topoDesc.extent.MMax + offsetSURF
     if elevation == "Feet":
         if bdrkRaster == "":
             Ymin = (float(maxDepthElev) * 0.3048) * float(ve)
@@ -376,8 +379,6 @@ if __name__ == "__main__":
             arcpy.management.Delete(
                 [os.path.join(scratchDir, "XSEC_{}_zm_{}".format(xsec,os.path.splitext(os.path.basename(lines))[0])),
                  os.path.join(scratchDir, "XSEC_{}_z".format(xsec))])
-            arcpy.management.DeleteField(lines, ["ROUTEID",
-                                                 "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
             xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
             xsecMap.addDataFromPath(frame)
             xsecMap.addDataFromPath(labels)

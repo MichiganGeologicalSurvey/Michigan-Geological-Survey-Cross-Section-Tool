@@ -3,7 +3,7 @@
 # XSEC_Profiles.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place profiles onto a cross-sectional view.
 # *****************************************************
@@ -25,7 +25,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_Profiles.py, Version 1.2.6"
+version = "XSEC_Profiles.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_Profiles.py"
 uf.management.githubVersion(
     vString=version,
@@ -34,7 +34,7 @@ uf.management.githubVersion(
 uf.management.AddMsgAndPrint("-----------------------------")
 
 def profileViews(xsecLine,xsecName,raster,ve,elev_units,outGDB):
-    zm_line,offset,id_checkField = uf.xsec.zmLine_Generation(
+    zm_line,offset = uf.xsec.zmLine_Generation(
         lineFeature=xsecLine,
         XSEC_NAME=xsecName,
         defaultGDB=scratchDir,
@@ -60,9 +60,10 @@ def profileViews(xsecLine,xsecName,raster,ve,elev_units,outGDB):
         zm_line=zm_line,
         ve=ve,
         profile=profilePath,
-        id_field=id_checkField,
+        id_field="XSEC",
         elev_units=elev_units,
-        XSEC_NAME=xsecName
+        XSEC_NAME=xsecName,
+        adjustDist=offset
     )
     return profilePath
 
@@ -103,7 +104,7 @@ if __name__ == "__main__":
             allValues = uf.management.unique_values(table=lines1, field="XSEC")
             demSR = arcpy.Describe(surfRaster).spatialReference
             linesSR = arcpy.Describe(lines1).spatialReference
-            if demSR.name == linesSR.name:
+            if demSR.linearUnitName == linesSR.linearUnitName:
                 lines = lines1
             else:
                 newLines = os.path.join(scratchDir, "XSEC_Lines_Projection")
@@ -121,7 +122,6 @@ if __name__ == "__main__":
             uf.management.AddMsgAndPrint("Cleaning default geodatabse...")
             arcpy.management.Delete([os.path.join(scratchDir,"XSEC_{}_zm".format(os.path.splitext(os.path.basename(lines))[0],xsec)),
                                      os.path.join(scratchDir,"XSEC_{}_z".format(os.path.splitext(os.path.basename(lines))[0],xsec))])
-            arcpy.management.DeleteField(lines,["ROUTEID","{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0],xsec)])
             xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
             xsecMap.addDataFromPath(profile_view)
             uf.management.AddMsgAndPrint("-----------------------------")

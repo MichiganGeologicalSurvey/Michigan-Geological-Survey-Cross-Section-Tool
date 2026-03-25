@@ -3,7 +3,7 @@
 # XSEC_Boreholes.py
 # Version: 1.0
 # Date: 7/9/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place borehole sticks onto a cross-sectional view.
 # *****************************************************
@@ -25,7 +25,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_Boreholes.py, Version 1.2.6"
+version = "XSEC_Boreholes.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_Boreholes.py"
 uf.management.githubVersion(
     vString=version,
@@ -36,7 +36,7 @@ uf.management.AddMsgAndPrint("-----------------------------")
 def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,buff,ve,outGDB,stickType):
     # We will determine which points are within the user defined area
     # Initially, we will need to create the route to place the points.
-    zm_line, offset, id_checkField = uf.xsec.zmLine_Generation(
+    zm_line, offset = uf.xsec.zmLine_Generation(
         lineFeature=lineFeature,
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
@@ -67,12 +67,12 @@ def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,bu
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
         route_line=zm_line,
-        checkField=id_checkField,
+        checkField="XSEC",
         sel_dist=buff,
         event_props=rProps
     )
     eventLayerWells = "XSEC_{}_Events".format(xsec)
-    arcpy.lr.MakeRouteEventLayer(zm_line, id_checkField, eventTableWells, rProps, eventLayerWells, "#", "#",
+    arcpy.lr.MakeRouteEventLayer(zm_line, "XSEC", eventTableWells, rProps, eventLayerWells, "#", "#",
                                  "ANGLE_FIELD", "TANGENT")
     locPoints = os.path.join(scratchDir, "XSEC_{}_wellsLocated".format(xsec))
     arcpy.management.CopyFeatures(eventLayerWells, locPoints)
@@ -85,7 +85,8 @@ def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,bu
         elev_field=zField,
         depth_field="WELL_DEPTH",
         elev_units=elev_units,
-        ve=ve
+        ve=ve,
+        adjustDist=offset
     )
     nameID = 1
     while True:
@@ -170,8 +171,6 @@ if __name__ == "__main__":
              os.path.join(scratchDir, "XSEC_{}_bhLines".format(xsec)),
              os.path.join(scratchDir, "XSEC_{}_zWells".format(xsec)),
              bhLines])
-        arcpy.management.DeleteField(lines,
-                                     ["ROUTEID", "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
         xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
         xsecMap.addDataFromPath(finalBorehole)
         uf.management.AddMsgAndPrint("-----------------------------")

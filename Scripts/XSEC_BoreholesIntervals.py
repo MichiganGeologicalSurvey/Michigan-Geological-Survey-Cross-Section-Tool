@@ -3,7 +3,7 @@
 # XSEC_BoreholeIntervals.py
 # Version: 1.0
 # Date: 7/9/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place borehole sticks with segmented borehole lithologies onto a cross-sectional view.
 # *****************************************************
@@ -26,7 +26,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_BoreholesIntervals.py, Version 1.2.6"
+version = "XSEC_BoreholesIntervals.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_BoreholesIntervals.py"
 uf.management.githubVersion(
     vString=version,
@@ -169,8 +169,6 @@ if __name__ == "__main__":
                           "XSEC_{}_wellsLocated".format(xsec)),
              os.path.join(scratchDir, "XSEC_{}_bhLines".format(xsec)),
              os.path.join(scratchDir, "XSEC_{}_zWells".format(xsec))])
-        arcpy.management.DeleteField(lines,
-                                     ["ROUTEID", "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
         xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
         xsecMap.addDataFromPath(intervalBoreholes)
         uf.management.AddMsgAndPrint("-----------------------------")

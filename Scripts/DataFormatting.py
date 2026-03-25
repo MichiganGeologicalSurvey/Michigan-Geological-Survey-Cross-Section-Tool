@@ -3,12 +3,12 @@
 # DataFormatting.py
 # Version: 1.0
 # Date: 5/31/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/5/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A Python custom script to reformat Wellogic data or other datasets into a format reviewed by the Michigan Geological Survey.
 # *****************************************************
 # *****************************************************
-
+import datetime
 import os
 import arcpy
 import Utility_Functions as uf
@@ -28,13 +28,12 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "DataFormatting.py, Version 1.2.6"
+version = "DataFormatting.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/DataFormatting.py"
 uf.management.githubVersion(
     vString=version,
     rawurl=url
 )
-
 def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable):
     uf.management.AddMsgAndPrint("Formatting lithology groups...")
     aggTable = "https://services1.arcgis.com/vFQXQuqACTPxa4Yc/arcgis/rest/services/Lithology_Aggredation_Terms/FeatureServer/0"
@@ -49,43 +48,6 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
                 "W/Cobbles", "W/Dolomite", "W/Gravel", "W/Gypsum", "W/Limestone", "W/Pyrite", "W/Sand",
                 "W/Sandstone", "W/Shale",
                 "W/Silt", "W/Stones", "Wood"]
-    bdrkGroup = []
-    clayGroup = []
-    claySandGroup = []
-    tillGroup = []
-    topsoilGroup = []
-    sandGroup = []
-    gravelGroup = []
-    organicsGroup = []
-    sandFineGroup = []
-    sandGravelGroup = []
-    unkGroup = []
-    with arcpy.da.SearchCursor(aggTable,[field.name for field in arcpy.ListFields(aggTable)]) as cursor:
-        for row in cursor:
-            if row[5] == "BDRK":
-                bdrkGroup.append([row[4],"BDRK"])
-            elif row[5] == "CLAY":
-                clayGroup.append([row[4],"CLAY"])
-            elif row[5] == "CLSA":
-                claySandGroup.append([row[4],"CLSA"])
-            elif row[5] == "DIAM":
-                tillGroup.append([row[4],"DIAM"])
-            elif row[5] == "TOPS":
-                topsoilGroup.append([row[4],"TOPS"])
-            elif row[5] == "SAND":
-                sandGroup.append([row[4],"SAND"])
-            elif row[5] == "GRAV":
-                gravelGroup.append([row[4],"GRAV"])
-            elif row[5] == "ORGA":
-                organicsGroup.append([row[4],"ORGA"])
-            elif row[5] == "FSAN":
-                sandFineGroup.append([row[4],"FSAN"])
-            elif row[5] == "SAGR":
-                sandGravelGroup.append([row[4],"SAGR"])
-            elif row[5] == "UNK":
-                unkGroup.append([row[4],"UNK"])
-        del row
-        del cursor
     uf.management.AddMsgAndPrint("Add applicable domains if necessary...")
     domainNames = ["Color","Consistency","Drilling","GroupNames","LithAgg","LithAquifer","PrimaryLith",
                     "SecondaryLith","Simplified","WellStatus","TestMethod","Texture","Verification","WellAquifer",
@@ -358,22 +320,31 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
     try:
         # Now we can fill in some of the fields using the formatted data...
         uf.management.AddMsgAndPrint("    - Begin filling new fields and attribute calculations...")
-        aggGroups = [bdrkGroup, clayGroup, claySandGroup, tillGroup, topsoilGroup, sandGroup, gravelGroup,
-                     organicsGroup, sandFineGroup, sandGravelGroup, unkGroup]
-        aggExpression1 = """var prim = $feature.PRIM_LITH;
-                                    var sec = $feature.LITH_MOD;
-                                    var concat = Concatenate([prim,sec],"_");
-                                    var groups = {aggGroups};
-                                    for (var i in groups) {{
-                                       for (var j in groups[i]) {{
-                                           if (concat == groups[i][j][0]) {{
-                                               return groups[i][j][1];
-                                           }}
-                                       }}
-                                    }}
-                                    """
-        groupList = str(aggGroups).replace("'", '"')
-        aggExpression2 = aggExpression1.format(aggGroups=groupList)
+        uf.management.AddMsgAndPrint("       - Aggregated lithology term...")
+        arcpy.management.CalculateField(
+            in_table=finalLith,
+            field="PRIM_SEC",
+            expression='Concatenate([$feature.PRIM_LITH,$feature.LITH_MOD],"_")',
+            expression_type="ARCADE",
+            code_block="",
+            field_type="TEXT",
+            enforce_domains="NO_ENFORCE_DOMAINS"
+        )
+        arcpy.management.JoinField(
+            in_data=finalLith,
+            in_field="PRIM_SEC",
+            join_table=aggTable,
+            join_field="PRIM_CONC",
+            fields="Final_Term"
+        )
+        arcpy.management.CalculateField(
+            in_table=finalLith,
+            field="LITH_AGG",
+            expression='!Final_Term!',
+            expression_type="PYTHON3",
+            code_block="",
+            field_type="TEXT"
+        )
         simpleExpression = ("""var aggregate = $feature.LITH_AGG;
                             var sediment = When(Equals(aggregate,"UNK"),"UNK",
                                                 Equals(aggregate,"BDRK"),"BEDROCK",
@@ -383,6 +354,7 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
                                                 Equals(aggregate,"TOPS") || Equals(aggregate,"ORGA"),"ORGANIC",
                                                 "UNK");
                             return sediment""")
+
         drillerExpression = ("""var driller = [$feature.COLOR,$feature.PRIM_LITH,$feature.CAL_TEXTURE,$feature.CALC_LITH_MOD_1,$feature.CALC_LITH_MOD_2,$feature.CALC_CONSISTENCY];
                             var desc = [];
                             for (var i in driller) {
@@ -391,14 +363,7 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
                                 }
                             }
                             return Concatenate(desc," ")""")
-        arcpy.management.CalculateField(
-            in_table=finalLith,
-            field="LITH_AGG",
-            expression=aggExpression2,
-            expression_type="ARCADE",
-            code_block="",
-            field_type="TEXT"
-        )
+        uf.management.AddMsgAndPrint("       - Simplified aggregated lithology term...")
         arcpy.management.CalculateField(
             in_table=finalLith,
             field="SEDIMENT",
@@ -407,6 +372,7 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
             code_block="",
             field_type="TEXT"
         )
+        uf.management.AddMsgAndPrint("       - Driller description...")
         arcpy.management.CalculateField(
             in_table=finalLith,
             field="DRLLR_DESC",
@@ -415,6 +381,7 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
             code_block="",
             field_type="TEXT"
         )
+        uf.management.AddMsgAndPrint("       - MAQTYPE Blanks...")
         arcpy.management.CalculateField(
             in_table=finalLith,
             field="MAQTYPE",
@@ -423,11 +390,13 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
             code_block="",
             field_type="TEXT"
         )
+        uf.management.AddMsgAndPrint("       - Aquifer name...")
         arcpy.management.CalculateField(
             in_table=finalLith,
             field="AQUIFER_NAME",
             expression='!AQTYPE! + "-" + !MAQTYPE!'
         )
+        uf.management.AddMsgAndPrint("       - First bedrock code...")
         uf.format.firstBDRKValue(
             bdrkTable=finalLith,
             origTable=finalLith,
@@ -438,11 +407,13 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
             aqField="AQTYPE",
             defaultGDB=scratchDir
         )
+        uf.management.AddMsgAndPrint("       - Top depth field...")
         arcpy.management.CalculateField(
             in_table=finalLith,
             field="DEPTH_TOP",
             expression="!DEPTH! - !THICKNESS!"
         )
+        uf.management.AddMsgAndPrint("       - Lithology descriptor fields...")
         with arcpy.da.UpdateCursor(finalLith, ["LITH_MOD","CAL_TEXTURE","CALC_CONSISTENCY","CALC_LITH_MOD_1"]) as cursor:
             for row in cursor:
                 if row[0] in textGroup:
@@ -474,34 +445,14 @@ def dataFormatting(geologyGDB, prjName, wellPoints,lithTable,prjDEM,reviewTable)
                     else:
                         return "N"
                         """)
+        uf.management.AddMsgAndPrint("       - Reviewed well records...")
         arcpy.management.CalculateField(
             in_table=finalLith,
             field="VERIFIED",
             expression="review(!REVIEW!,!PHASE!)",
             code_block=reviewBlock
         )
-        arcpy.management.DeleteField(finalLith,["REVIEW","PHASE"])
-        groupBlock = ("""def groupName(group,aq):
-                if group is not None:
-                    return group
-                else:
-                    if (aq.startswith("R") or aq.startswith("U")):
-                        return "UNK"
-                    else:
-                        return "GLA"
-            """)
-        arcpy.management.CalculateField(
-            in_table=finalLith,
-            field="GLA_GROUP",
-            expression="groupName(!GLA_GROUP!,!AQUIFER_NAME!)",
-            code_block=groupBlock
-        )
-        arcpy.management.CalculateField(
-            in_table=finalLith,
-            field="BDRK_GROUP",
-            expression="groupName(!BDRK_GROUP!,!AQUIFER_NAME!)",
-            code_block=groupBlock
-        )
+        arcpy.management.DeleteField(finalLith,["REVIEW","PHASE","PRIM_SEC","PRIM_CONC","Final_Term"])
     except:
         uf.management.AddMsgAndPrint("ERROR 004: Failed to fill in empty fields",2)
         raise SystemError

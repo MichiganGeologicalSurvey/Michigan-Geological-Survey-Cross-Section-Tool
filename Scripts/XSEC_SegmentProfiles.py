@@ -3,7 +3,7 @@
 # XSEC_SegmentProfiles.py
 # Version: 1.2
 # Date: 7/9/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: Command python code to create and place profiles onto a cross-sectional view and segment the profiles based on a polygon of the user's choosing.
 # *****************************************************
@@ -30,7 +30,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_SegmentProfiles.py, Version 1.2.6"
+version = "XSEC_SegmentProfiles.py, Version 1.2.7"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_SegmentProfiles.py"
 uf.management.githubVersion(
     vString=version,
@@ -39,7 +39,7 @@ uf.management.githubVersion(
 uf.management.AddMsgAndPrint("-----------------------------")
 
 def segmentProfiles(xsecLine,xsec,ve,raster,elev_units,polygon,outGDB):
-    zm_line, offset, id_checkField = uf.xsec.zmLine_Generation(
+    zm_line, offset = uf.xsec.zmLine_Generation(
         lineFeature=xsecLine,
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
@@ -51,7 +51,7 @@ def segmentProfiles(xsecLine,xsec,ve,raster,elev_units,polygon,outGDB):
     arcpy.lr.LocateFeaturesAlongRoutes(
         in_features=polygon,
         in_routes=zm_line,
-        route_id_field=id_checkField,
+        route_id_field="XSEC",
         radius_or_tolerance="#",
         out_table=eventsTable,
         out_event_properties=conProps,
@@ -65,7 +65,7 @@ def segmentProfiles(xsecLine,xsec,ve,raster,elev_units,polygon,outGDB):
                           sort_field=[["FromM", "ASCENDING"]])
     uf.xsec.placeEvents(
         inRoutes=zm_line,
-        idRteFld=id_checkField,
+        idRteFld="XSEC",
         eventTable=locatedEvents_sort,
         eventRteFld="rkey",
         fromVar="FromM",
@@ -95,9 +95,10 @@ def segmentProfiles(xsecLine,xsec,ve,raster,elev_units,polygon,outGDB):
         profile=profilePath,
         id_field="rkey",
         elev_units=elev_units,
-        XSEC_NAME=xsec
+        XSEC_NAME=xsec,
+        adjustDist=offset
     )
-    #arcpy.management.Delete([locatedEvents,locatedEvents_sort,eventsTable])
+    arcpy.management.Delete([locatedEvents,locatedEvents_sort,eventsTable])
     return profilePath
 
 if __name__ == "__main__":
@@ -141,7 +142,7 @@ if __name__ == "__main__":
             demSR = arcpy.Describe(surfRaster).spatialReference
             linesSR = arcpy.Describe(lines1).spatialReference
             polySR = arcpy.Describe(polygon).spatialReference
-            if demSR.name == linesSR.name:
+            if demSR.linearUnitName == linesSR.linearUnitName:
                 lines = lines1
             else:
                 newLines = os.path.join(scratchDir, "XSEC_Lines_Projection")
@@ -218,8 +219,6 @@ if __name__ == "__main__":
                     [os.path.join(scratchDir, "XSEC_{}_zm".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                      os.path.join(scratchDir, "XSEC_{}_z".format(os.path.splitext(os.path.basename(lines))[0], xsec)),
                      newPoly,linesIntersect,pointsIntersect,xsecFeatureInt])
-                arcpy.management.DeleteField(lines, ["ROUTEID",
-                                                     "{}_{}_ID".format(os.path.splitext(os.path.basename(lines))[0], xsec)])
                 xsecMap = prj.listMaps("XSEC_{}".format(xsec.replace("-", "_").replace(" ", "_")))[0]
                 xsecMap.addDataFromPath(segProfile)
                 uf.management.AddMsgAndPrint("-----------------------------")

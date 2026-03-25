@@ -1,9 +1,9 @@
 # *****************************************************
 # *****************************************************
 # Utility_Functions.py
-# Version: 1.0
+# Version: 1.2.7
 # Date: 5/30/2024
-# Last Modified Date: 12/2/2025
+# Last Modified Date: 3/25/2026
 # Original Author: Matthew Bell, Michigan Geological Survey, matthew.e.bell@wmich.edu
 # Description: A utility functions python file to store generic definitions and functions related to other main software scripts.
 # *****************************************************
@@ -706,7 +706,7 @@ class xsec:
         arcpy.management.DeleteField(eventLocTable,dupDetectField)
         return eventLocTable
 
-    def boreholes(locatedPoints,XSEC_NAME,defaultGDB,elev_field,depth_field,elev_units,ve):
+    def boreholes(locatedPoints,XSEC_NAME,defaultGDB,elev_field,depth_field,elev_units,ve,adjustDist):
         # Used to create the borehole sticks that is observed in the selection distance described by the user.
         bhLineNames = "XSEC_{}_bhLines".format(XSEC_NAME)
         bhSticks = os.path.join(defaultGDB,bhLineNames)
@@ -738,7 +738,7 @@ class xsec:
             if elev_units == "Meters":
                 i = i + 1
                 bhArray = []
-                X = row[mField]
+                X = row[mField] + float(adjustDist)
                 Ytop = float(row[elevID])
                 Ybot = Ytop - float(row[depthID])
                 bhArray.append((X, Ytop * float(ve)))
@@ -760,7 +760,7 @@ class xsec:
             if elev_units == "Feet":
                 i = i + 1
                 bhArray = []
-                X = row[mField]
+                X = row[mField] + float(adjustDist)
                 Ytop = float(row[elevID]) * 0.3048
                 Ybot = Ytop - float(row[depthID]) * 0.3048
                 bhArray.append((X, Ytop * float(ve)))
@@ -782,7 +782,7 @@ class xsec:
         del tRows, cur
         return bhSticks
 
-    def surfPoints(locatedPoints,XSEC_NAME,defaultGDB,elev_field,elev_units,ve):
+    def surfPoints(locatedPoints,XSEC_NAME,defaultGDB,elev_field,elev_units,ve,adjustDist):
         # Used to create the borehole sticks that is observed in the selection distance described by the user.
         nameID = 1
         while True:
@@ -813,7 +813,7 @@ class xsec:
         for row in tRows:
             if elev_units == "Meters":
                 i = i + 1
-                X = row[tRows.fields.index("M")]
+                X = row[tRows.fields.index("M")] + float(adjustDist)
                 Ytop = float(row[elevID])
                 surfPnt = [float(X),float(Ytop* float(ve))]
                 vals = list(row).copy()
@@ -830,7 +830,7 @@ class xsec:
                         "Could not create feature from objectid {} in {}\n{}".format(row[oid_i], locatedPoints, e), 1)
             if elev_units == "Feet":
                 i = i + 1
-                X = row[tRows.fields.index("M")]
+                X = row[tRows.fields.index("M")] + float(adjustDist)
                 Ytop = float(row[elevID]) * 0.3048
                 surfPnt = [float(X),float(Ytop* float(ve))]
                 vals = list(row).copy()
@@ -861,7 +861,7 @@ class xsec:
         else:
             pass
 
-    def plan2side(zm_line,ve,profile,id_field,elev_units,XSEC_NAME):
+    def plan2side(zm_line,ve,profile,id_field,elev_units,XSEC_NAME,adjustDist):
         fldOBJ = arcpy.ListFields(zm_line)
         flds = [f.name for f in fldOBJ if f.type != "Geometry"]
         flds.append("SHAPE@")
@@ -883,7 +883,7 @@ class xsec:
                 array = []
                 line = row[-1]
                 for pnt in line[0]:
-                    X = pnt.M
+                    X = pnt.M + float(adjustDist)
                     Y = pnt.Z
                     array.append((X,Y * float(ve)))
                 vals[-2] = array
@@ -897,7 +897,7 @@ class xsec:
                 array = []
                 line = row[-1]
                 for pnt in line[0]:
-                    X = pnt.M
+                    X = pnt.M + float(adjustDist)
                     Y = pnt.Z * 0.3048
                     array.append((X, Y * float(ve)))
                 vals[-2] = array
@@ -914,47 +914,72 @@ class xsec:
             arcpy.management.MakeFeatureLayer(lineFeature,"lineLayers")
             arcpy.management.SelectLayerByAttribute("lineLayers","NEW_SELECTION","{}='{}'".format("XSEC",XSEC_NAME))
 
-            xs_name = management.limitString("{}_{}".format(os.path.basename(lineFeature),XSEC_NAME),60)
-            tempFields = [f.name for f in arcpy.ListFields("lineLayers")]
-            checkField = "{}_ID".format(xs_name)
-            idField = next((f for f in tempFields if f == checkField),None)
-            idExists = xsec.fieldNone("lineLayers",checkField)
-            if idField is None or idExists == False:
-                idField = "ROUTEID"
-                arcpy.management.AddField("lineLayers",idField,"TEXT")
-                arcpy.management.CalculateField("lineLayers",checkField,"'01'","PYTHON3")
             # Add z values
             z_line = os.path.join(defaultGDB,"XSEC_{}_z".format(XSEC_NAME))
             management.testAndDelete(z_line)
             arcpy.ddd.InterpolateShape(raster_surface,"lineLayers",z_line)
-            arcpy.management.AddField(z_line,"QUAD","TEXT")
-            with arcpy.da.UpdateCursor(z_line,["DIRECTION","QUAD"]) as cursor:
+            if int(arcpy.management.GetCount(z_line)[0]) == 0:
+                management.AddMsgAndPrint(f"{XSEC_NAME} does not intersect the DEM.\nRemove cross-section line or deselect from analysis.",1)
+                quit()
+            with arcpy.da.SearchCursor(z_line,["DIRECTION"]) as cursor:
                 for row in cursor:
                     if (row[0] == "W-E" or row[0] == "NW-SE" or row[0] == "N-S"):
                         quad = "Northwest"
-                        row[1] = quad
-                        management.AddMsgAndPrint(" - Analyzing line {} from the NW quad...".format(XSEC_NAME))
-                    if (row[0] == "SW-NE" or row[0] == "S-N"):
+                        management.AddMsgAndPrint(" - Analyzing line {} from the NW quadrant...".format(XSEC_NAME))
+                    elif (row[0] == "SW-NE" or row[0] == "S-N"):
                         quad = "Southwest"
-                        row[1] = quad
-                        management.AddMsgAndPrint(" - Analyzing line {} from the SW quad...".format(XSEC_NAME))
-                    if (row[0] == "NE-SW" or row[0] == "E-W"):
+                        management.AddMsgAndPrint(" - Analyzing line {} from the SW quadrant...".format(XSEC_NAME))
+                    elif (row[0] == "NE-SW" or row[0] == "E-W"):
                         quad = "Northeast"
-                        row[1] = quad
-                        management.AddMsgAndPrint(" - Analyzing line {} from the NE quad...".format(XSEC_NAME))
-                    if row[0] == "SE-NW":
+                        management.AddMsgAndPrint(" - Analyzing line {} from the NE quadrant...".format(XSEC_NAME))
+                    elif row[0] == "SE-NW":
                         quad = "Southeast"
-                        row[1] = quad
-                        management.AddMsgAndPrint(" - Analyzing line {} from the SE quad...".format(XSEC_NAME))
+                        management.AddMsgAndPrint(" - Analyzing line {} from the SE quadrant...".format(XSEC_NAME))
                     else:
-                        pass
-                    cursor.updateRow(row)
-                del row, cursor
-            cpDir = arcpy.SearchCursor(z_line,"","","","QUAD D").next().getValue("QUAD")
-            cp = xsec.getCPValue(quadrant=cpDir)
+                        management.AddMsgAndPrint(f"{XSEC_NAME} does not have a directionality.\nPlease review cross-section direction field before proceeding.",1)
+                        quit()
+                    del row
+                del cursor
+
+            cp = xsec.getCPValue(quadrant=quad)
+            tmpLine = os.path.join(defaultGDB,"tempLine")
+            arcpy.lr.CreateRoutes(
+                in_line_features="lineLayers",
+                route_id_field="XSEC",
+                out_feature_class=tmpLine,
+                measure_source="LENGTH",
+                coordinate_priority=cp,
+                measure_factor=1
+            )
             zm_line = os.path.join(defaultGDB,"XSEC_{}_zm_{}".format(XSEC_NAME,os.path.splitext(os.path.basename(raster_surface))[0]))
             management.testAndDelete(zm_line)
-            arcpy.lr.CreateRoutes(z_line,checkField,zm_line,"LENGTH","#","#",cp)
+            if arcpy.Describe(raster_surface).spatialReference.linearUnitName == "Meter":
+                arcpy.lr.CreateRoutes(
+                    in_line_features=z_line,
+                    route_id_field="XSEC",
+                    out_feature_class=zm_line,
+                    measure_source="LENGTH",
+                    coordinate_priority=cp,
+                    measure_factor=1
+                )
+            elif arcpy.Describe(raster_surface).spatialReference.linearUnitName == "Foot":
+                arcpy.lr.CreateRoutes(
+                    in_line_features=z_line,
+                    route_id_field="XSEC",
+                    out_feature_class=zm_line,
+                    measure_source="LENGTH",
+                    coordinate_priority=cp,
+                    measure_factor=0.3048
+                )
+            elif arcpy.Describe(raster_surface).spatialReference.linearUnitName == "Foot_US":
+                arcpy.lr.CreateRoutes(
+                    in_line_features=z_line,
+                    route_id_field="XSEC",
+                    out_feature_class=zm_line,
+                    measure_source="LENGTH",
+                    coordinate_priority=cp,
+                    measure_factor=0.3048006096012192
+                )
 
             # Now, we need to make sure the line starts where it is supposed to in the cross-section view.
             # Step 1: Find the start and end points of the reference line and the zm_line...
@@ -965,32 +990,43 @@ class xsec:
                     startPointRoute = rastGeom.firstPoint
                     endPointRoute = rastGeom.lastPoint
                     break
-            with arcpy.da.SearchCursor("lineLayers",["SHAPE@"]) as cursor:
+                del row, cursor
+            with arcpy.da.SearchCursor(tmpLine,["SHAPE@"]) as cursor:
                 for row in cursor:
                     refGeom = row[0]
-                    startPointRef = refGeom.firstPoint
-                    endPointRef = refGeom.lastPoint
                     break
+                del row, cursor
+
 
             # Step 2: Get the extent of the lines to see if the profile has been offset...
             if startPointRoute.M == 0:
-                if (startPointRef.X == startPointRoute.X and startPointRef.Y == startPointRoute.Y):
+                m_value_on_orig = refGeom.measureOnLine(startPointRoute)
+                if int(m_value_on_orig) == 0:
                     pass
                 else:
-                    gapX = abs(startPointRoute.X - startPointRef.X)
-                    gapY = abs(startPointRoute.Y - startPointRef.Y)
-                    gapDist = ((gapX ** 2) + (gapY ** 2)) ** 0.5
-                    moveLength += gapDist
+                    moveLength += m_value_on_orig
+                #if (startPointRef.X == startPointRoute.X and startPointRef.Y == startPointRoute.Y):
+                #    pass
+                #else:
+                #    gapX = abs(startPointRoute.X - startPointRef.X)
+                #    gapY = abs(startPointRoute.Y - startPointRef.Y)
+                #    gapDist = ((gapX ** 2) + (gapY ** 2)) ** 0.5
+                #    moveLength += gapDist
             if endPointRoute.M == 0:
-                if (endPointRef.X == endPointRoute.X and endPointRef.Y == endPointRoute.Y):
+                m_value_on_origEnd = refGeom.measureOnLine(endPointRoute)
+                if int(m_value_on_origEnd) == 0:
                     pass
                 else:
-                    gapX = abs(startPointRef.X - endPointRef.X)
-                    gapY = abs(startPointRef.Y - endPointRef.Y)
-                    gapDist = ((gapX ** 2) + (gapY ** 2)) ** 0.5
-                    moveLength += gapDist
+                    moveLength += m_value_on_origEnd
+                #if (endPointRef.X == endPointRoute.X and endPointRef.Y == endPointRoute.Y):
+                #    pass
+                #else:
+                #    gapX = abs(startPointRef.X - endPointRef.X)
+                #    gapY = abs(startPointRef.Y - endPointRef.Y)
+                #    gapDist = ((gapX ** 2) + (gapY ** 2)) ** 0.5
+                #    moveLength += gapDist
             # Clean up the dataset at this stage...
-            return (zm_line,moveLength,checkField)
+            return (zm_line,moveLength)
         else:
             management.AddMsgAndPrint("The fields 'XSEC' and/or 'DIRECTION' is not found within the cross-section lines feature class. Please add both/either field.\nAcceptable terms for 'DIRECTION' are as follows:\n'W-E', 'NW-SE', 'E-W', 'SW-NE', 'S-N', 'N-S', 'NE-SW', 'SE-NW'",2)
             raise SystemError
@@ -1048,10 +1084,19 @@ class xsec:
             search_distance=searchDist,
             selection_type="NEW_SELECTION"
         )
-        with arcpy.da.SearchCursor(locations, ["WELLID"]) as cursor:
-            for row in cursor:
-                wellIds.append(row[0])
-            del row, cursor
+        if custom == "true":
+            bhFieldscustom = arcpy.ValueTable(3)
+            bhFieldscustom.loadFromString(parm_bhFields)
+            idFieldcustom = bhFieldscustom.getValue(0, 0)
+            with arcpy.da.SearchCursor(locations, [idFieldcustom]) as cursor:
+                for row in cursor:
+                    wellIds.append(row[0])
+                del row, cursor
+        else:
+            with arcpy.da.SearchCursor(locations, ["WELLID"]) as cursor:
+                for row in cursor:
+                    wellIds.append(row[0])
+                del row, cursor
         xsecPoints = os.path.join(scratchDir, "LocalPoints_BH_MGS")
         management.testAndDelete(xsecPoints)
         with arcpy.EnvManager(maintainAttachments="NOT_MAINTAIN_ATTACHEMENTS", preserveGlobalIds=True):
@@ -1063,17 +1108,27 @@ class xsec:
             in_layer_or_view=points,
             selection_type="CLEAR_SELECTION"
         )
-        if int_table == "":
+        if int_table is None:
             xsecInterval = None
             pass
         else:
             xsecInterval = os.path.join(scratchDir, "LocalPoints_INT_MGS")
             management.testAndDelete(xsecInterval)
-            routeWellsInt = arcpy.management.SelectLayerByAttribute(
-                in_layer_or_view=int_table,
-                selection_type="ADD_TO_SELECTION",
-                where_clause="WELLID IN {}".format(wellIds).replace("[", "(").replace("]", ")"),
-                invert_where_clause=None)
+            if custom == "true":
+                bhFieldscustom = arcpy.ValueTable(3)
+                bhFieldscustom.loadFromString(parm_bhFields)
+                idFieldcustom = bhFieldscustom.getValue(0, 0)
+                routeWellsInt = arcpy.management.SelectLayerByAttribute(
+                    in_layer_or_view=int_table,
+                    selection_type="ADD_TO_SELECTION",
+                    where_clause="{} IN {}".format(idFieldcustom,wellIds).replace("[", "(").replace("]", ")"),
+                    invert_where_clause=None)
+            else:
+                routeWellsInt = arcpy.management.SelectLayerByAttribute(
+                    in_layer_or_view=int_table,
+                    selection_type="ADD_TO_SELECTION",
+                    where_clause="WELLID IN {}".format(wellIds).replace("[", "(").replace("]", ")"),
+                    invert_where_clause=None)
             with arcpy.EnvManager(maintainAttachments="NOT_MAINTAIN_ATTACHEMENTS", preserveGlobalIds=True):
                 arcpy.management.CopyRows(
                     in_rows=routeWellsInt,
@@ -1231,20 +1286,21 @@ class xsec:
                 )
             outRaster = os.path.join(scratchDir,"Raster_Project")
         else:
-            rasterUnits = str(rasterSR.linearUnitName)
-            if rasterUnits != "Meters":
-                management.AddMsgAndPrint("* Raster's linear units are not in meters. Reprojecting to area for cross-section view...")
-                with arcpy.EnvManager(extent=arcpy.Describe(lines).extent):
-                    arcpy.management.ProjectRaster(
-                        in_raster=surfRaster,
-                        out_raster=os.path.join(scratchDir, "Raster_Project"),
-                        out_coor_system=arcpy.SpatialReference(102100),
-                        resampling_type="NEAREST",
-                        cell_size="",
-                        geographic_transform=None,
-                        Registration_Point=None
-                    )
-                outRaster = os.path.join(scratchDir, "Raster_Project")
-            else:
-                outRaster = surfRaster
+            outRaster = surfRaster
+            #rasterUnits = str(rasterSR.linearUnitName)
+            #if rasterUnits != "Meter":
+            #    management.AddMsgAndPrint("* Raster's linear units are not in meters. Reprojecting to area for cross-section view...")
+            #    with arcpy.EnvManager(extent=arcpy.Describe(lines).extent):
+            #        arcpy.management.ProjectRaster(
+            #            in_raster=surfRaster,
+            #            out_raster=os.path.join(scratchDir, "Raster_Project"),
+            #            out_coor_system=arcpy.SpatialReference(102100),
+            #            resampling_type="NEAREST",
+            #            cell_size="",
+            #            geographic_transform=None,
+            #            Registration_Point=None
+            #        )
+            #    outRaster = os.path.join(scratchDir, "Raster_Project")
+            #else:
+            #    outRaster = surfRaster
         return outRaster
