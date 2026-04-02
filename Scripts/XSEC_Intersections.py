@@ -159,7 +159,8 @@ def intersectingPoints(lineFeature,selectDist,otherFeatures,xsec,surfDEM,elev_un
         defaultGDB=outGDB,
         elev_field=zField,
         elev_units=elev_units,
-        ve=ve
+        ve=ve,
+        adjustDist=offset
     )
     intersectedFeatures.append(surfMarkedPoints)
     if otherFeatures == "":

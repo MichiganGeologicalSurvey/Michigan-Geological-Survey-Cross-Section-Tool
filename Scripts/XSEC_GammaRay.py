@@ -132,7 +132,8 @@ def gammaRay(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,wellid,w
         elev_field=zField,
         depth_field="GAMMA_DEPTH",
         elev_units=elev_units,
-        ve=ve
+        ve=ve,
+        adjustDist=offset
     )
     nameID = 1
     while True:
