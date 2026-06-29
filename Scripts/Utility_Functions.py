@@ -1084,6 +1084,7 @@ class xsec:
             search_distance=searchDist,
             selection_type="NEW_SELECTION"
         )
+        newDepth = "WELL_DEPTH"
         if custom == "true":
             bhFieldscustom = arcpy.ValueTable(3)
             bhFieldscustom.loadFromString(parm_bhFields)
@@ -1178,7 +1179,7 @@ class xsec:
             newTopDepthField = None
             newBotDepthField = None
 
-            if int_table == "":
+            if int_table is None:
                 pass
             else:
                 intervFields = arcpy.ValueTable(3)
@@ -1250,14 +1251,7 @@ class xsec:
                 )
             except:
                 pass
-            try:
-                arcpy.management.AlterField(
-                    in_table=xsecPoints,
-                    field=depthField,
-                    new_field_name="WELL_DEPTH"
-                )
-            except:
-                pass
+            newDepth = depthField
             if elevField == "":
                 newElevField = "DEM_ELEV"
             else:
@@ -1267,7 +1261,7 @@ class xsec:
             newTopDepthField = "DEPTH_TOP"
             newBotDepthField = "DEPTH"
 
-        return xsecPoints,xsecInterval,"WELLID",newElevField,"WELL_DEPTH",newTopDepthField,newBotDepthField
+        return xsecPoints,xsecInterval,"WELLID",newElevField,newDepth,newTopDepthField,newBotDepthField
 
     def rasterProject_GeoProj(surfRaster,lines,scratchDir):
         rasterSR = arcpy.Describe(surfRaster).spatialReference

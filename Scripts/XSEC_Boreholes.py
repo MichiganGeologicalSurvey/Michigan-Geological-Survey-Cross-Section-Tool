@@ -25,7 +25,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_Boreholes.py, Version 1.2.7"
+version = "XSEC_Boreholes.py, Version 1.2.8"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_Boreholes.py"
 uf.management.githubVersion(
     vString=version,
@@ -33,7 +33,7 @@ uf.management.githubVersion(
 )
 uf.management.AddMsgAndPrint("-----------------------------")
 
-def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,buff,ve,outGDB,stickType):
+def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,depthField,well_points,buff,ve,outGDB,stickType):
     # We will determine which points are within the user defined area
     # Initially, we will need to create the route to place the points.
     zm_line, offset = uf.xsec.zmLine_Generation(
@@ -83,7 +83,7 @@ def boreholeSticks(lineFeature,xsec,surfDEM,elev_units,elev_field,well_points,bu
         XSEC_NAME=xsec,
         defaultGDB=scratchDir,
         elev_field=zField,
-        depth_field="WELL_DEPTH",
+        depth_field=depthField,
         elev_units=elev_units,
         ve=ve,
         adjustDist=offset
@@ -140,7 +140,7 @@ if __name__ == "__main__":
         custom=arcpy.GetParameterAsText(3),
         points=arcpy.GetParameterAsText(2),
         raster=surfRaster,
-        int_table="",
+        int_table=None,
         xsecline=lines,
         searchDist=arcpy.GetParameterAsText(6),
         parm_bhFields=arcpy.GetParameterAsText(4),
@@ -156,6 +156,7 @@ if __name__ == "__main__":
             surfDEM=surfRaster,
             elev_units=arcpy.GetParameterAsText(5),
             elev_field=newElevField,
+            depthField=newWellDepth,
             well_points=updateBhPoint,
             buff=arcpy.GetParameterAsText(6),
             ve=arcpy.GetParameterAsText(7),

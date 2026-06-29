@@ -26,7 +26,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_BoreholesIntervals.py, Version 1.2.7"
+version = "XSEC_BoreholesIntervals.py, Version 1.2.8"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_BoreholesIntervals.py"
 uf.management.githubVersion(
     vString=version,
@@ -34,13 +34,14 @@ uf.management.githubVersion(
 )
 uf.management.AddMsgAndPrint("-----------------------------")
 
-def boreholeIntervals(lines,xsec,dem,elevUnits,elevField,wellPoints,buff,ve,outGDB,stickType,intervalTable,depth_top,depth_bot):
+def boreholeIntervals(lines,xsec,dem,elevUnits,elevField,depthField,wellPoints,buff,ve,outGDB,stickType,intervalTable,depth_top,depth_bot):
     bhSticks,bhLines = XSEC_Boreholes.boreholeSticks(
         lineFeature=lines,
         xsec=xsec,
         surfDEM=dem,
         elev_units=elevUnits,
         elev_field=elevField,
+        depthField=depthField,
         well_points=wellPoints,
         buff=buff,
         ve=ve,
@@ -49,7 +50,7 @@ def boreholeIntervals(lines,xsec,dem,elevUnits,elevField,wellPoints,buff,ve,outG
     )
     intervalRoutes = os.path.join(scratchDir,"XSEC_{}_bhRoutes_{}".format(xsec,os.path.splitext(os.path.basename(intervalTable))[0]))
     uf.management.testAndDelete(intervalRoutes)
-    arcpy.lr.CreateRoutes(bhLines,"WELLID",intervalRoutes,"ONE_FIELD","WELL_DEPTH","#","UPPER_LEFT")
+    arcpy.lr.CreateRoutes(bhLines,"WELLID",intervalRoutes,"ONE_FIELD",depthField,"#","UPPER_LEFT")
     Lprop = "WELLID LINE {} {}".format(depth_top,depth_bot)
     arcpy.lr.MakeRouteEventLayer(
         in_routes=intervalRoutes,
@@ -151,6 +152,7 @@ if __name__ == "__main__":
             dem=surfRaster,
             elevUnits=arcpy.GetParameterAsText(7),
             elevField=newElevField,
+            depthField=newWellDepth,
             wellPoints=updateBhPoint,
             buff=arcpy.GetParameterAsText(8),
             ve=arcpy.GetParameterAsText(9),

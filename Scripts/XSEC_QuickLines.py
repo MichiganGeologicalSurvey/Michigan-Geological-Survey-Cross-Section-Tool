@@ -30,7 +30,7 @@ arcpy.env.preserveGlobalIds = True
 arcpy.env.transferGDBAttributeProperties = True
 arcpy.env.transferDomains = True
 uf.management.AddMsgAndPrint("Scratch Geodatabase: {}".format(os.path.basename(scratchDir)))
-version = "XSEC_QuickLines.py, Version 1.2.7"
+version = "XSEC_QuickLines.py, Version 1.2.8"
 url = "https://raw.githubusercontent.com/MichiganGeologicalSurvey/Michigan-Geological-Survey-Cross-Section-Tool/refs/heads/Master/Scripts/XSEC_QuickLines.py"
 uf.management.githubVersion(
     vString=version,
@@ -93,47 +93,50 @@ if __name__ == "__main__":
     newConstDateField = "CONST_DATE"
     newBdrkField = "MGS_DEPTH_2_BDRK"
     if arcpy.GetParameterAsText(4) == "true":
-        extraFields = arcpy.ValueTable(2)
-        extraFields.loadFromString(arcpy.GetParameterAsText(7))
-        constDateField = extraFields.getValue(0, 0)
-        bdrkField = extraFields.getValue(0, 1)
-        if (constDateField != "" and constDateField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
-            if arcpy.ListFields(updateBhPoint, constDateField)[0].type != "Date":
-                arcpy.management.AddField(
-                    in_table=updateBhPoint,
-                    field_name="CONST_DATE_2",
-                    field_type="DATE",
-                    field_is_nullable="NULLABLE",
-                    field_is_required="NON_REQUIRED"
-                )
-                arcpy.management.CalculateField(
-                    in_table=updateBhPoint,
-                    field="CONST_DATE_2",
-                    expression=f'!{constDateField}!'
-                )
-                newConstDateField = "CONST_DATE_2"
+        if (arcpy.GetParameterAsText(9) == "" and arcpy.GetParameterAsText(10) == ""):
+            pass
+        else:
+            extraFields = arcpy.ValueTable(2)
+            extraFields.loadFromString(arcpy.GetParameterAsText(7))
+            constDateField = extraFields.getValue(0, 0)
+            bdrkField = extraFields.getValue(0, 1)
+            if (constDateField != "" and constDateField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
+                if arcpy.ListFields(updateBhPoint, constDateField)[0].type != "Date":
+                    arcpy.management.AddField(
+                        in_table=updateBhPoint,
+                        field_name="CONST_DATE_2",
+                        field_type="DATE",
+                        field_is_nullable="NULLABLE",
+                        field_is_required="NON_REQUIRED"
+                    )
+                    arcpy.management.CalculateField(
+                        in_table=updateBhPoint,
+                        field="CONST_DATE_2",
+                        expression=f'!{constDateField}!'
+                    )
+                    newConstDateField = "CONST_DATE_2"
+                else:
+                    pass
             else:
                 pass
-        else:
-            pass
-        if (bdrkField != "" and bdrkField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
-            if arcpy.ListFields(updateBhPoint, bdrkField)[0].type != "Double":
-                arcpy.management.AddField(
-                    in_table=updateBhPoint,
-                    field_name="MGS_DEPTH_2_BDRK",
-                    field_type="DOUBLE",
-                    field_is_nullable="NULLABLE",
-                    field_is_required="NON_REQUIRED"
-                )
-                arcpy.management.CalculateField(
-                    in_table=updateBhPoint,
-                    field="MGS_DEPTH_2_BDRK",
-                    expression=f'!{bdrkField}!'
-                )
+            if (bdrkField != "" and bdrkField in [f.name for f in arcpy.ListFields(updateBhPoint)]):
+                if arcpy.ListFields(updateBhPoint, bdrkField)[0].type != "Double":
+                    arcpy.management.AddField(
+                        in_table=updateBhPoint,
+                        field_name="MGS_DEPTH_2_BDRK",
+                        field_type="DOUBLE",
+                        field_is_nullable="NULLABLE",
+                        field_is_required="NON_REQUIRED"
+                    )
+                    arcpy.management.CalculateField(
+                        in_table=updateBhPoint,
+                        field="MGS_DEPTH_2_BDRK",
+                        expression=f'!{bdrkField}!'
+                    )
+                else:
+                    newBdrkField = bdrkField
             else:
-                newBdrkField = bdrkField
-        else:
-            pass
+                pass
     for xsec in allValues:
         uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
         intervalBoreholes = XSEC_BoreholesIntervals.boreholeIntervals(
@@ -142,14 +145,15 @@ if __name__ == "__main__":
             dem=surfRaster,
             elevUnits=arcpy.GetParameterAsText(8),
             elevField=newElevField,
+            depthField=newWellDepth,
             wellPoints=updateBhPoint,
             buff=arcpy.GetParameterAsText(13),
             ve=arcpy.GetParameterAsText(14),
             outGDB=arcpy.GetParameterAsText(16),
             stickType=arcpy.GetParameterAsText(12),
             intervalTable=updateIntTable,
-            depth_top="DEPTH_TOP",
-            depth_bot="DEPTH"
+            depth_top=newTopDepthField,
+            depth_bot=newBotDepthField
         )
         # Now, to clean up the database for the next cross-section or other steps...
         uf.management.AddMsgAndPrint(" - Cleaning default geodatabse...")
@@ -470,25 +474,15 @@ if __name__ == "__main__":
     uf.management.AddMsgAndPrint("BEGIN GRID-LINE PROFILE...")
     for xsec in allValues:
         uf.management.AddMsgAndPrint("PROCESSING {}...".format(xsec))
-        tempPoints = os.path.join(scratchDir, "TempBH_Points")
         xsecLine = arcpy.management.SelectLayerByAttribute(
             in_layer_or_view=lines,
             selection_type="NEW_SELECTION",
             where_clause="XSEC = '{}'".format(xsec),
             invert_where_clause=None)
-        well_near = arcpy.management.SelectLayerByLocation(
-            in_layer=updateBhPoint,
-            overlap_type="WITHIN_A_DISTANCE",
-            select_features=xsecLine,
-            search_distance=arcpy.GetParameterAsText(13)
-        )
-        arcpy.management.CopyFeatures(well_near, tempPoints)
-        arcpy.management.SelectLayerByAttribute(lines, "CLEAR_SELECTION")
-        arcpy.management.SelectLayerByAttribute(arcpy.GetParameterAsText(2), "CLEAR_SELECTION")
 
         depthElev = []
         topElev = []
-        with arcpy.da.SearchCursor(tempPoints, [newElevField, "WELL_DEPTH"]) as cursor:
+        with arcpy.da.SearchCursor(updateBhPoint, [newElevField, newWellDepth]) as cursor:
             for row in cursor:
                 depthElev.append(float(row[0]) - float(row[1]))
                 topElev.append(float(row[0]))
@@ -642,7 +636,6 @@ if __name__ == "__main__":
             xsecMap.defaultCamera.setExtent(arcpy.Describe(extentLyr).extent)
             prj.save()
         uf.management.AddMsgAndPrint("-----------------------------")
-        arcpy.management.Delete(tempPoints)
         depthElev.clear()
         topElev.clear()
     uf.management.AddMsgAndPrint(
