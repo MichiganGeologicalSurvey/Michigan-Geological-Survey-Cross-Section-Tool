@@ -1,5 +1,5 @@
 # Michigan Geological Survey: Cross-Section Tool Box for ArcGIS Pro
- The following tool was developed to automate the process of creating GIS layers for groundwater analysis, as well as provide a resource for generating cross-section views of geologic data in ArcGIS Pro. The implementation of the tools is as follows:
+ The following tool was developed to automate the process of creating GIS layers in the application of groundwater analysis, subsurface topography elevations, and general subsurface investigation. This toolbox also provides a resource for generating cross-section views of geologic data in ArcGIS Pro. The implementation of the tools is as follows:
 1. Creates a project area from a DEM and acquires a range of Michigan specific datasets for use in maps and cross-sections (Not applicable for other states).
 2. Reformats water well datasets to be used in analyses (Michigan specific).
 3. Generates groundwater surface profiles.
@@ -51,14 +51,6 @@ ArcGIS Pro toolbox containing all available MGS custom tools which include:
 **UserGuide_Poster_GSA_2025.pdf**
 
   This is an instructional document that was presented at the Geological Society of America's North-Central Section Meeting. Contains helpful hints and tricks to the Cross-Section tools as of 4/1/2025.
-  
-**ArcGIS_Pro_TrainingDocument_XSEC_ONLY_YYYYMMDD.pdf**
-
-  This is an instructional document for creating cross-sections only. Applicable for most users.
-
-**ArcGIS_Pro_TrainingDocument_WellogicData_YYYYMMDD.pdf**  
-  
-  This is an instructional document designed for creating projects out of data from the Wellogic water well database.
 
  **Templates**  
 
